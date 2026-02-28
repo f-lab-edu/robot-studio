@@ -6,10 +6,17 @@ class ApiClient:
 
     def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url
-        self.session = aiohttp.ClientSession()
+        self._session: aiohttp.ClientSession | None = None
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
 
     async def close(self):
-        await self.session.close()
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     async def get_presigned_url(self, object_name: str) -> str:
         """단일 presigned URL 요청"""
