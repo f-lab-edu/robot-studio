@@ -10,3 +10,4 @@ httpx
 python-dotenv
 fastapi
 pydantic
+st3215
