@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout
 from rclpy.logging import get_logger
-from ..widgets import Sidebar, CameraPreviewArea, DatasetSettingPanel, DataCollectionPanel
+from ..widgets import Sidebar, CameraPreviewArea, DatasetSettingPanel, DataCollectionPanel, TeleopPanel
 
 logger = get_logger('MainWindow')
 
@@ -37,7 +37,12 @@ class MainWindow(QMainWindow):
         self.sidebar.exit_requested.connect(self.close)
         main_layout.addWidget(self.sidebar)
 
-        # 2. 메인 콘텐츠 영역
+        # 2. 텔레옵 패널
+        self.teleop_panel = TeleopPanel()
+        self.teleop_panel.setVisible(False)
+        main_layout.addWidget(self.teleop_panel, 1)
+
+        # 3. 메인 콘텐츠 영역
         self.camera_preview_area = CameraPreviewArea()
         self.camera_preview_area.setVisible(False)
         self.camera_preview_area.camera_selected.connect(self._on_camera_selected)
@@ -61,12 +66,15 @@ class MainWindow(QMainWindow):
 
     def _on_menu_selected(self, menu_id: str):
         # 모든 영역 숨기기
+        self.teleop_panel.setVisible(False)
         self.camera_preview_area.setVisible(False)
         self.dataset_setting_panel.setVisible(False)
         self.data_collection_panel.setVisible(False)
         self.empty_area.setVisible(False)
 
-        if menu_id == 'camera_preview':
+        if menu_id == 'teleop':
+            self.teleop_panel.setVisible(True)
+        elif menu_id == 'camera_preview':
             self.camera_preview_area.setVisible(True)
         elif menu_id == 'dataset_setting':
             self.dataset_setting_panel.setVisible(True)
@@ -100,6 +108,8 @@ class MainWindow(QMainWindow):
         self.empty_area.setVisible(False)      
 
     def closeEvent(self, event):
+        if hasattr(self, 'teleop_panel'):
+            self.teleop_panel.cleanup()
         if hasattr(self, 'camera_preview_area'):
             self.camera_preview_area.cleanup()
         super().closeEvent(event)

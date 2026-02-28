@@ -72,6 +72,11 @@ class Sidebar(QWidget):
         layout.addWidget(header)
 
         # 메뉴 아이템들
+        teleop_item = SidebarItem('teleop', 'Teleop')
+        teleop_item.clicked.connect(lambda: self._on_item_clicked('teleop'))
+        layout.addWidget(teleop_item)
+        self._items['teleop'] = teleop_item
+
         camera_item = SidebarItem('camera_preview', 'Camera Preview')
         camera_item.clicked.connect(lambda: self._on_item_clicked('camera_preview'))
         layout.addWidget(camera_item)
