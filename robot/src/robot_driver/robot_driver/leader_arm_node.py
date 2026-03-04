@@ -40,6 +40,8 @@ class LeaderArmNode(Node):
         try:
             bus = ST3215(port)
             if all(bus.PingServo(i) for i in SERVO_IDS):
+                for i in SERVO_IDS:
+                    bus.StopServo(i)
                 self._bus = bus
                 self._connected = True
                 self._pub_status.publish(String(data='connected'))

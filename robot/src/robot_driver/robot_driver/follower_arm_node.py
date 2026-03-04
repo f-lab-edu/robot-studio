@@ -21,6 +21,8 @@ class FollowerArmNode(Node):
 
         self._sub_cmd = self.create_subscription(
             JointState, '/follower/joint_command', self._on_command, 10)
+        self._sub_teleop = self.create_subscription(
+            String, '/teleop/status', self._on_teleop_status, 10)
         self._pub_joints = self.create_publisher(JointState, '/follower/joint_states', 10)
         self._pub_status = self.create_publisher(String, '/follower/connection_status', 10)
 
@@ -31,6 +33,19 @@ class FollowerArmNode(Node):
         self._timer = self.create_timer(1.0 / LEADER_HZ, self._feedback_callback)  # 30 Hz
 
         self.add_on_set_parameters_callback(self._on_params_changed)
+
+    def _on_teleop_status(self, msg: String):
+        if not self._connected:
+            return
+        try:
+            if msg.data == 'active':
+                for i in SERVO_IDS:
+                    self._bus.StartServo(i)
+            else:
+                for i in SERVO_IDS:
+                    self._bus.StopServo(i)
+        except Exception as e:
+            self.get_logger().error(f'Torque toggle error: {e}')
 
     def _on_params_changed(self, params):
         for param in params:
@@ -45,7 +60,7 @@ class FollowerArmNode(Node):
             bus = ST3215(port)
             if all(bus.PingServo(i) for i in SERVO_IDS):
                 for i in SERVO_IDS:
-                    bus.StartServo(i)
+                    bus.StopServo(i)
                     bus.SetMode(i, 0)
                     bus.SetAcceleration(i, 0)
                 self._bus = bus
