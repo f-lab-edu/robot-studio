@@ -11,8 +11,8 @@ SERVO_IDS = [1, 2, 3, 4, 5, 6]
 
 
 class LeaderArmNode(Node):
-    def __init__(self):
-        super().__init__('leader_arm_node')
+    def __init__(self, **kwargs):
+        super().__init__('leader_arm_node', **kwargs)
 
         self.declare_parameter('port', '/dev/ttyACM0')
         self.declare_parameter('frequency', 30.0)

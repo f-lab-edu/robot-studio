@@ -14,8 +14,8 @@ LEADER_HZ = 30.0
 
 
 class FollowerArmNode(Node):
-    def __init__(self):
-        super().__init__('follower_arm_node')
+    def __init__(self, **kwargs):
+        super().__init__('follower_arm_node', **kwargs)
 
         self.declare_parameter('port', '/dev/ttyACM1')
 
