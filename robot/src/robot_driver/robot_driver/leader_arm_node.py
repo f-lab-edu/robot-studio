@@ -62,11 +62,13 @@ class LeaderArmNode(Node):
             return
 
         try:
-            positions = [float(self._bus.ReadPosition(i)) for i in SERVO_IDS]
+            raw = [self._bus.ReadPosition(i) for i in SERVO_IDS]
+            if any(p is None for p in raw):
+                return
             msg = JointState()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.name = JOINT_NAMES
-            msg.position = positions
+            msg.position = [float(p) for p in raw]
             self._pub_joints.publish(msg)
         except Exception as e:
             self.get_logger().error(f'Leader arm read error: {e}')
