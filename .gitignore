@@ -43,3 +43,6 @@ ros2_ws/log/
 .colcon/
 *.bag
 *.db3
+
+# Note
+*.md
