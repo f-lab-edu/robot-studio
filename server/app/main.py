@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="MinIO Presigned URL Service", lifespan=lifespan)
+app = FastAPI(title="Robot Studio API", lifespan=lifespan)
 
 app.include_router(objects.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
