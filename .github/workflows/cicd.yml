@@ -12,6 +12,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.repository == 'gomsonixx/robot-studio'
     permissions:
       contents: read
       packages: write
