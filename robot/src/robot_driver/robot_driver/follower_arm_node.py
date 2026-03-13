@@ -98,7 +98,6 @@ class FollowerArmNode(Node):
                 speed = int(distance * LEADER_HZ)
                 self._bus.SetSpeed(servo_id, speed)
                 self._bus.WritePosition(servo_id, pos_clamped)
-                self._current_positions[idx] = float(pos_clamped)
         except Exception as e:
             self.get_logger().error(f'Follower arm write error: {e}')
             self._close_bus()
