@@ -1,4 +1,10 @@
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
     ports:
@@ -16,10 +22,12 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://robot_studio:robot_studio@postgres:5432/robot_studio
+      REDIS_URL: redis://redis:6379 
     env_file:
       - ./server/.env
     depends_on:
       - postgres
+      - redis
     volumes:
       - ./server/app:/app/app
 

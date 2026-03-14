@@ -1,8 +1,12 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    # S3 CONFIGURATION
     S3_BUCKET_NAME: str = "lerobot-soarm-dataset"
-    PRESIGNED_URL_EXPIRE_MINUTES: int = 10
+    PRESIGNED_URL_EXPIRE_MINUTES: int = 10   
+
+    # REDIS CONFIGURATION
+    REDIS_URL: str
 
     #DATABASE CONFIGURATION
     DATABASE_URL: str = "postgresql+asyncpg://robot_studio:robot_studio@localhost:5432/robot_studio"
