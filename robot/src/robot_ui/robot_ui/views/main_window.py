@@ -1,6 +1,8 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout
+import asyncio
+from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QStackedWidget
 from rclpy.logging import get_logger
-from ..widgets import Sidebar, CameraPreviewArea, DatasetSettingPanel, DataCollectionPanel, TeleopPanel
+from ..widgets import Sidebar, CameraPreviewArea, DatasetSettingPanel, DataCollectionPanel, TeleopPanel, LoginWebView
+from ..utils.api_client import ApiClient
 
 logger = get_logger('MainWindow')
 
@@ -21,13 +23,21 @@ class MainWindow(QMainWindow):
             }
         """)
 
+        self.api_client = ApiClient()
         self._setup_ui()
 
     def _setup_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        self.stacked_widget = QStackedWidget()
+        self.setCentralWidget(self.stacked_widget)
 
-        main_layout = QHBoxLayout(central_widget)
+        # 페이지 0: 로그인
+        self.login_webview = LoginWebView()
+        self.login_webview.login_success.connect(self._on_login_success)
+        self.stacked_widget.addWidget(self.login_webview)  # index 0
+
+        # 페이지 1: 메인
+        main_page = QWidget()
+        main_layout = QHBoxLayout(main_page)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
@@ -63,6 +73,24 @@ class MainWindow(QMainWindow):
         self.empty_area = QWidget()
         self.empty_area.setStyleSheet("background-color: #1e1e1e;")
         main_layout.addWidget(self.empty_area, 1)
+
+        self.stacked_widget.addWidget(main_page)  # index 1
+        self.stacked_widget.setCurrentIndex(0)
+
+    def _on_login_success(self, code: str):
+        asyncio.create_task(self._exchange_and_login(code))
+
+    async def _exchange_and_login(self, code: str):
+        try:
+            tokens = await self.api_client.exchange_code(code)
+            self.api_client.set_token(tokens["access_token"])
+            self.stacked_widget.setCurrentIndex(1)
+        except ValueError:
+            logger.warning("Code exchange failed: invalid or expired code")
+            self.login_webview.reset()
+        except Exception as e:
+            logger.error(f"Code exchange failed: {e}")
+            self.login_webview.reset()
 
     def _on_menu_selected(self, menu_id: str):
         # 모든 영역 숨기기
@@ -105,7 +133,7 @@ class MainWindow(QMainWindow):
         self.camera_preview_area.setVisible(False)
         self.dataset_setting_panel.setVisible(False)
         self.data_collection_panel.setVisible(True)
-        self.empty_area.setVisible(False)      
+        self.empty_area.setVisible(False)
 
     def closeEvent(self, event):
         if hasattr(self, 'teleop_panel'):
