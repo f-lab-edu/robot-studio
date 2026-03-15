@@ -69,3 +69,15 @@ async def issue_code(
 ):
     code = await service.issue_code(str(current_user.id), redis)
     return {"code": code}
+
+@router.post("/token-exchange")
+async def token_exchange(
+    code: str,
+    service: AuthService = Depends(get_auth_service),
+    redis=Depends(get_redis),
+):
+    try:
+        access_token, refresh_token = await service.exchange_code(code, redis)
+        return {"access_token": access_token, "refresh_token": refresh_token}
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))

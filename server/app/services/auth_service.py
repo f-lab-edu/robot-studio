@@ -79,3 +79,13 @@ class AuthService:
         code = secrets.token_urlsafe(32)
         await redis.setex(f"auth_code:{code}", 30, user_id)
         return code
+
+    async def exchange_code(self, code: str, redis) -> tuple[str, str]:
+        """코드를 토큰으로 교환 (코드는 즉시 삭제, refresh token DB 저장 포함)"""
+        user_id = await redis.getdel(f"auth_code:{code}")
+        if user_id is None:
+            raise ValueError("Invalid or expired code")
+        user = await self.user_repo.find_by_id(user_id)
+        if user is None:
+            raise ValueError("User not found")
+        return await self._issue_tokens(user)
