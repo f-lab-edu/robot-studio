@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,3 +73,9 @@ class AuthService:
             raise ValueError("사용자를 찾을 수 없습니다")
 
         return await self._issue_tokens(user)
+
+    async def issue_code(self, user_id: str, redis) -> str:
+        """1회용 코드 발급 — 30초 유효"""
+        code = secrets.token_urlsafe(32)
+        await redis.setex(f"auth_code:{code}", 30, user_id)
+        return code

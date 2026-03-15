@@ -15,7 +15,17 @@ export default function Login() {
       const { access_token, refresh_token } = await login(email, password);
       localStorage.setItem("access_token", access_token);
       localStorage.setItem("refresh_token", refresh_token);
-      navigate("/");
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("from") === "robot") {
+        const res = await fetch("/api/v1/auth/issue-code", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        const { code } = await res.json();
+        navigate(`/auth/callback?code=${code}`);
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인에 실패했습니다");
     }

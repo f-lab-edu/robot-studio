@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel
 
 class SignupRequest(BaseModel):
@@ -20,3 +22,14 @@ class RefreshRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class UserResponse(BaseModel):
+    id: uuid.UUID
+    username: str | None
+    email: str
+
+    class Config:
+        from_attributes = True
+
+class AuthCodeResponse(BaseModel):
+    code: str
