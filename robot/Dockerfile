@@ -2,6 +2,7 @@ FROM ros:humble-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=unix:0
+ENV QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox"
 
 # ROS 개발 도구 설치
 RUN apt-get update && apt-get install -y \
