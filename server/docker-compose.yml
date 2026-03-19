@@ -1,13 +1,9 @@
 services:
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     restart: unless-stopped
   postgres:
     image: postgres:16
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: robot_studio
       POSTGRES_PASSWORD: robot_studio
@@ -29,6 +25,8 @@ services:
       - redis
     volumes:
       - ./app:/app/app
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini
 
 volumes:
   postgres_data:
