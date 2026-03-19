@@ -24,6 +24,20 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1 \
     libdbus-1-3 \
     python3-pip \
+    libnss3 \
+    libnspr4 \
+    libxkbfile1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libxtst6 \
+    libxss1 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
 # 한글 폰트 설치
