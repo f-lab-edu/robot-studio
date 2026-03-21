@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools', 'aiohttp', 'qasync'],
+    install_requires=['setuptools', 'aiohttp', 'qasync', 'PySide6-WebEngine'],
     zip_safe=True,
     maintainer='User',
     maintainer_email='user@example.com',

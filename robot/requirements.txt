@@ -11,3 +11,4 @@ python-dotenv
 fastapi
 pydantic
 st3215
+pytest-asyncio>=0.23.0
