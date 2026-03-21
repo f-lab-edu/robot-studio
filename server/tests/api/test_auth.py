@@ -119,3 +119,130 @@ async def test_token_exchange_code_deleted_from_redis(client, db_session, fake_r
 
     remaining = await fake_redis.get(f"auth_code:{code}")
     assert remaining is None
+
+
+# ──────────────────────────────────────────────
+# signup / login / refresh / me
+# ──────────────────────────────────────────────
+
+async def test_signup_returns_201_with_user_info(client):
+    response = await client.post(
+        "/api/v1/auth/signup",
+        json={"username": "alice", "email": "alice@example.com", "password": "secret123"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["email"] == "alice@example.com"
+    assert body["username"] == "alice"
+
+
+async def test_signup_duplicate_email_returns_409(client):
+    payload = {"username": "alice", "email": "dup@example.com", "password": "secret"}
+    await client.post("/api/v1/auth/signup", json=payload)
+    response = await client.post("/api/v1/auth/signup", json=payload)
+    assert response.status_code == 409
+
+
+async def test_signup_missing_field_returns_422(client):
+    response = await client.post(
+        "/api/v1/auth/signup",
+        json={"username": "alice"},
+    )
+    assert response.status_code == 422
+
+
+async def test_login_returns_200_with_tokens(client):
+    await client.post(
+        "/api/v1/auth/signup",
+        json={"username": "bob", "email": "bob@example.com", "password": "pw"},
+    )
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "bob@example.com", "password": "pw"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "access_token" in body
+    assert "refresh_token" in body
+
+
+async def test_login_wrong_email_returns_401(client):
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody@example.com", "password": "pw"},
+    )
+    assert response.status_code == 401
+
+
+async def test_login_wrong_password_returns_401(client):
+    await client.post(
+        "/api/v1/auth/signup",
+        json={"username": "carol", "email": "carol@example.com", "password": "correct"},
+    )
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "carol@example.com", "password": "wrong"},
+    )
+    assert response.status_code == 401
+
+
+async def test_refresh_returns_200_with_new_tokens(client):
+    await client.post(
+        "/api/v1/auth/signup",
+        json={"username": "dave", "email": "dave@example.com", "password": "pw"},
+    )
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "dave@example.com", "password": "pw"},
+    )
+    refresh_token = login_resp.json()["refresh_token"]
+
+    response = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "access_token" in body
+    assert "refresh_token" in body
+
+
+async def test_refresh_invalid_token_returns_401(client):
+    response = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": "invalid_token_value"},
+    )
+    assert response.status_code == 401
+
+
+async def test_me_returns_200_with_user_info(client):
+    await client.post(
+        "/api/v1/auth/signup",
+        json={"username": "eve", "email": "eve@example.com", "password": "pw"},
+    )
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "eve@example.com", "password": "pw"},
+    )
+    access_token = login_resp.json()["access_token"]
+
+    response = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"] == "eve@example.com"
+
+
+async def test_me_without_token_returns_401(client):
+    response = await client.get("/api/v1/auth/me")
+    assert response.status_code == 401
+
+
+async def test_me_with_invalid_token_returns_401(client):
+    response = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalid.token.here"},
+    )
+    assert response.status_code == 401
