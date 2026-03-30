@@ -29,14 +29,19 @@ class ApiClient:
             data = await response.json()
             return data['url']
 
-    async def upload_to_s3(self, presigned_url: str, video_path: str):
+    async def upload_to_s3(
+        self,
+        presigned_url: str,
+        file_path: str,
+        content_type: str = "video/mp4",
+    ):
         """Presigned URL로 파일 업로드"""
-        with open(video_path, 'rb') as f:
-            video_data = f.read()
+        with open(file_path, 'rb') as f:
+            data = f.read()
 
         async with self.session.put(
             presigned_url,
-            data=video_data,
-            headers={'Content-Type': 'video/mp4'},
+            data=data,
+            headers={'Content-Type': content_type},
         ) as response:
             response.raise_for_status()
