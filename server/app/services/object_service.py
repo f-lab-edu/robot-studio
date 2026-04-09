@@ -4,13 +4,13 @@ class ObjectService:
     def __init__(self, s3_client):
         self.client = s3_client
 
-    def create_presigned_upload_url(self, object_key: str) -> str:
+    def create_presigned_upload_url(self, object_key: str, content_type: str = "application/octet-stream") -> str:
         url = self.client.generate_presigned_url(
             "put_object",
             Params={
                 "Bucket": settings.S3_BUCKET_NAME,
                 "Key": object_key,
-                "ContentType": "video/mp4",
+                "ContentType": content_type,
             },
             ExpiresIn=settings.PRESIGNED_URL_EXPIRE_MINUTES * 60,
         )
