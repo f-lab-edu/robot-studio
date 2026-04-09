@@ -99,7 +99,8 @@ class CameraPreviewWidget(QFrame):
 class CameraPreviewArea(QWidget):
     """메인 영역의 카메라 프리뷰 그리드"""
 
-    camera_selected = Signal(str)  # topic_name 전달
+    camera_selected = Signal(str)   # topic_name 전달
+    topics_updated  = Signal(list)  # 사용 가능한 topic 목록 전달
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -232,6 +233,7 @@ class CameraPreviewArea(QWidget):
                 self._remove_preview(topic)
 
         self._update_grid_layout()
+        self.topics_updated.emit(list(self.preview_widgets.keys()))
 
     def _add_preview(self, topic_name: str):
         widget = CameraPreviewWidget(topic_name)
