@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from PySide6.QtWidgets import (
@@ -52,7 +53,7 @@ class DatasetSettingPanel(QWidget):
         # Dataset Name
         self.dataset_name_edit = self._create_lineedit_row(
             settings_layout, 'Dataset Name',
-            datetime.now().strftime("dataset_%Y%m%d"),
+            datetime.now().strftime("dataset_%Y%m%d_%H%M%S"),
         )
 
         # Camera role → topic 매핑
@@ -189,6 +190,16 @@ class DatasetSettingPanel(QWidget):
     # ------------------------------------------------------------------
     # 공개 API
     # ------------------------------------------------------------------
+
+    # 자동생성 이름 패턴: dataset_YYYYMMDD 또는 dataset_YYYYMMDD_HHMMSS
+    _AUTO_NAME_RE = re.compile(r'^dataset_\d{8}(_\d{6})?$')
+
+    def showEvent(self, event):
+        """패널이 표시될 때 자동생성된 이름이면 현재 시각으로 갱신"""
+        super().showEvent(event)
+        current = self.dataset_name_edit.text().strip()
+        if not current or self._AUTO_NAME_RE.fullmatch(current):
+            self.dataset_name_edit.setText(datetime.now().strftime("dataset_%Y%m%d_%H%M%S"))
 
     def set_available_topics(self, topics: list[str]):
         """CameraPreviewArea refresh 결과로 ComboBox 목록 갱신"""
