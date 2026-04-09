@@ -422,6 +422,13 @@ class DataCollectionPanel(QWidget):
             lambda msg: self._joint_signal.received.emit(list(msg.position)), 10
         )
 
+    def update_camera_roles(self, camera_roles: dict):
+        """토픽 목록 갱신 시 카메라 그리드만 업데이트 (녹화 중엔 무시)"""
+        if self.is_recording:
+            return
+        self.settings['camera_roles'] = camera_roles
+        self._rebuild_camera_grid(camera_roles)
+
     def set_recording_config(self, settings: dict):
         self.settings = settings
 
