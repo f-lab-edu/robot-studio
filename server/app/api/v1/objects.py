@@ -20,7 +20,8 @@ async def get_upload_url(
 ):
     try:
         url = service.create_presigned_upload_url(
-            object_key=request.object_name
+            object_key=request.object_name,
+            content_type=request.content_type,
         )
         return PresignedUrlResponse(url=url)
     except Exception as e:
