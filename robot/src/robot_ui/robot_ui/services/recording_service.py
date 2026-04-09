@@ -218,10 +218,11 @@ class MultiCameraRecordingService:
         on_progress: Optional[Callable[[int], None]] = None,
         ask_result: Optional[Callable[[int], bool]] = None,
         on_countdown: Optional[Callable] = None,
+        on_collection_done: Optional[Callable[[int], None]] = None,
     ):
         queue = asyncio.Queue()
         await asyncio.gather(
-            self._collect_episodes(settings, session_dir, queue, on_status, on_progress, ask_result, on_countdown),
+            self._collect_episodes(settings, session_dir, queue, on_status, on_progress, ask_result, on_countdown, on_collection_done),
             self._process_episodes(settings, session_dir, queue, on_status, on_progress),
         )
 
@@ -247,7 +248,7 @@ class MultiCameraRecordingService:
         settings: dict,
         session_dir: Path,
         queue: asyncio.Queue,
-        on_status, on_progress, ask_result, on_countdown,
+        on_status, on_progress, ask_result, on_countdown, on_collection_done=None,
     ):
         """수집 루프 (producer): 에피소드 수집 후 episode_data를 queue에 넣는다."""
         episodes     = settings.get('episodes', 1)
@@ -294,6 +295,8 @@ class MultiCameraRecordingService:
                 else:
                     await asyncio.sleep(term_length)
 
+        if on_collection_done:
+            on_collection_done(episodes)
         await queue.put(None)  # sentinel: 워커 종료 신호
 
     async def _process_episodes(

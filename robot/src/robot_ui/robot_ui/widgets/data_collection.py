@@ -115,6 +115,66 @@ class _JointRow(QWidget):
         self._val.setText(str(iv))
 
 
+# ─── 인코딩/업로드 진행 팝업 ──────────────────────────────────────────────────
+
+class _PostProcessDialog(QDialog):
+    """수집 완료 후 인코딩·업로드가 끝날 때까지 사용자 조작을 막는 모달 팝업"""
+
+    def __init__(self, total: int, already_done: int, parent=None):
+        super().__init__(parent)
+        self._total = total
+        self.setWindowTitle("처리 중...")
+        self.setWindowFlags(
+            Qt.WindowType.Dialog |
+            Qt.WindowType.CustomizeWindowHint |
+            Qt.WindowType.WindowTitleHint
+        )
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setFixedSize(400, 140)
+        self.setStyleSheet("background-color: #2d2d2d; color: #ffffff;")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(12)
+
+        self._status_label = QLabel("인코딩 및 업로드 중...")
+        self._status_label.setStyleSheet("color: #cccccc; font-size: 13px;")
+        layout.addWidget(self._status_label)
+
+        self._bar = QProgressBar()
+        self._bar.setRange(0, total)
+        self._bar.setValue(already_done)
+        self._bar.setFixedHeight(12)
+        self._bar.setTextVisible(False)
+        self._bar.setStyleSheet("""
+            QProgressBar { border: none; border-radius: 4px; background-color: #1e1e1e; }
+            QProgressBar::chunk { background-color: #0e639c; border-radius: 4px; }
+        """)
+        layout.addWidget(self._bar)
+
+        self._progress_label = QLabel(f"에피소드 {already_done} / {total} 완료")
+        self._progress_label.setStyleSheet("color: #858585; font-size: 11px;")
+        self._progress_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self._progress_label)
+
+    def set_status(self, text: str):
+        self._status_label.setText(text)
+
+    def set_progress(self, done: int):
+        self._bar.setValue(done)
+        self._progress_label.setText(f"에피소드 {done} / {self._total} 완료")
+        if done >= self._total:
+            self.accept()
+
+    def closeEvent(self, event):
+        event.ignore()  # 처리 완료 전 닫기 차단
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            return  # ESC 차단
+        super().keyPressEvent(event)
+
+
 # ─── 3-2-1 카운트다운 오버레이 ─────────────────────────────────────────────────
 
 class _CountdownOverlay(QWidget):
@@ -197,6 +257,7 @@ class DataCollectionPanel(QWidget):
 
         self._camera_widgets: dict[str, _CameraWidget] = {}
         self._joint_rows: list[_JointRow] = []
+        self._post_dialog: _PostProcessDialog | None = None
 
         self._setup_ui()
         self._countdown_overlay = _CountdownOverlay(self)
@@ -453,6 +514,7 @@ class DataCollectionPanel(QWidget):
             on_progress=self._on_progress,
             ask_result=self._ask_episode_result,
             on_countdown=self._on_countdown,
+            on_collection_done=self._on_collection_done,
         )
 
         for sub in self._frame_subscriptions:
@@ -470,12 +532,23 @@ class DataCollectionPanel(QWidget):
 
     def _on_status(self, text: str):
         self._status_label.setText(text)
+        if self._post_dialog and self._post_dialog.isVisible():
+            self._post_dialog.set_status(text)
 
     def _on_progress(self, episode_idx: int):
         done = episode_idx + 1
         total = self.settings.get('episodes', 1)
         self._progress_bar.setValue(done)
         self._progress_label.setText(f"{done} / {total}")
+        if self._post_dialog and self._post_dialog.isVisible():
+            self._post_dialog.set_progress(done)
+
+    def _on_collection_done(self, total: int):
+        """수집 완료 — 미처리 에피소드가 남아 있으면 진행 팝업 표시"""
+        already_done = self._progress_bar.value()
+        if already_done < total:
+            self._post_dialog = _PostProcessDialog(total, already_done, self)
+            self._post_dialog.show()
 
     def _on_countdown(self, phase: str, remaining: float, total: float, ep_idx: int, total_eps: int):
         """수집/대기 카운트다운 매 0.1s 호출"""
