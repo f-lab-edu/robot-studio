@@ -177,6 +177,11 @@ class MultiCameraRecordingService:
         self._frame_dirs: dict[str, Path] = {}
         self._frame_timestamps: dict[str, list] = {}
         self._frame_counters: dict[str, int] = {}
+        self._display_callback: Optional[callable] = None  # (role, cv_image) → None
+
+    def set_display_callback(self, cb):
+        """프레임 수신 시 UI에 표시하기 위한 콜백 설정. cb(role, cv_image)"""
+        self._display_callback = cb
 
     def start_episode(self, session_dir: Path, episode_index: int, camera_roles: dict):
         """에피소드 시작 시 role별 PNG 저장 디렉토리 초기화"""
@@ -200,6 +205,8 @@ class MultiCameraRecordingService:
             cv2.imwrite(str(self._frame_dirs[role] / f"{idx:06d}.png"), cv_image)
             self._frame_timestamps[role].append(time.time())
             self._frame_counters[role] += 1
+            if self._display_callback:
+                self._display_callback(role, cv_image.copy())
         except Exception as e:
             multi_camera_logger.error(f"[{role}] frame save failed: {e}")
 
@@ -210,19 +217,37 @@ class MultiCameraRecordingService:
         on_status: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[int], None]] = None,
         ask_result: Optional[Callable[[int], bool]] = None,
+        on_countdown: Optional[Callable] = None,
     ):
         queue = asyncio.Queue()
         await asyncio.gather(
-            self._collect_episodes(settings, session_dir, queue, on_status, on_progress, ask_result),
+            self._collect_episodes(settings, session_dir, queue, on_status, on_progress, ask_result, on_countdown),
             self._process_episodes(settings, session_dir, queue, on_status, on_progress),
         )
+
+    async def _tick_countdown(
+        self,
+        total: float,
+        phase: str,
+        episode_idx: int,
+        total_episodes: int,
+        on_countdown,
+    ):
+        """0.1초 간격으로 카운트다운 콜백을 호출하며 total초를 기다린다."""
+        elapsed = 0.0
+        interval = 0.1
+        while elapsed < total:
+            remaining = max(0.0, total - elapsed)
+            on_countdown(phase, remaining, total, episode_idx, total_episodes)
+            await asyncio.sleep(interval)
+            elapsed += interval
 
     async def _collect_episodes(
         self,
         settings: dict,
         session_dir: Path,
         queue: asyncio.Queue,
-        on_status, on_progress, ask_result,
+        on_status, on_progress, ask_result, on_countdown,
     ):
         """수집 루프 (producer): 에피소드 수집 후 episode_data를 queue에 넣는다."""
         episodes     = settings.get('episodes', 1)
@@ -239,7 +264,10 @@ class MultiCameraRecordingService:
             self.start_episode(session_dir, i, camera_roles)
             self.joint_collector.start_episode()
 
-            await asyncio.sleep(data_length)
+            if on_countdown:
+                await self._tick_countdown(data_length, 'recording', i, episodes, on_countdown)
+            else:
+                await asyncio.sleep(data_length)
 
             # 성공/실패 팝업
             success = True
@@ -261,9 +289,10 @@ class MultiCameraRecordingService:
             })
 
             if i < episodes - 1 and term_length > 0:
-                if on_status:
-                    on_status(f"Waiting {term_length}s before next episode...")
-                await asyncio.sleep(term_length)
+                if on_countdown:
+                    await self._tick_countdown(term_length, 'waiting', i, episodes, on_countdown)
+                else:
+                    await asyncio.sleep(term_length)
 
         await queue.put(None)  # sentinel: 워커 종료 신호
 
