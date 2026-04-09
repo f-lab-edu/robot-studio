@@ -19,6 +19,9 @@ class CameraNode(Node):
         self.publisher = self.create_publisher(Image, topic_name, 10)
         self.bridge = CvBridge()
 
+        self._retry_interval = 2.0  # 카메라 재연결 시도 간격 (초)
+        self._last_retry_time = 0.0
+
         self.timer = self.create_timer(0.033, self.timer_callback) # 30 FPS
 
     def _open_camera(self):
@@ -29,8 +32,13 @@ class CameraNode(Node):
 
     def timer_callback(self):
         if self.cap is None or not self.cap.isOpened():
-            if self._open_camera():
-                self.get_logger().info(f'Camera {self.camera_id} opened successfully')
+            now = self.get_clock().now().nanoseconds / 1e9
+            if now - self._last_retry_time >= self._retry_interval:
+                self._last_retry_time = now
+                if self._open_camera():
+                    self.get_logger().info(f'Camera {self.camera_id} reopened successfully')
+                else:
+                    self.get_logger().warn(f'Camera {self.camera_id} not available, retrying in {self._retry_interval}s')
             return
 
         ret, frame = self.cap.read()
@@ -38,9 +46,10 @@ class CameraNode(Node):
             msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8') # OpenCV 기본 색상 형식 사용
             self.publisher.publish(msg)
         else:
-            self.get_logger().error('Failed to capture image from camera')
+            self.get_logger().warn(f'Camera {self.camera_id} read failed, will retry in {self._retry_interval}s')
             self.cap.release()
             self.cap = None
+            self._last_retry_time = self.get_clock().now().nanoseconds / 1e9
 
 def main(args=None):
     rclpy.init(args=args)
