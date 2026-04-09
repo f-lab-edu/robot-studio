@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QDialog, QFrame, QGridLayout, QGroupBox, QScrollArea,
 )
 from PySide6.QtCore import Qt, Signal, QObject
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QPixmap, QPainter, QFont, QColor
 from rclpy.logging import get_logger
 from sensor_msgs.msg import Image, JointState
 
@@ -115,6 +115,54 @@ class _JointRow(QWidget):
         self._val.setText(str(iv))
 
 
+# ─── 3-2-1 카운트다운 오버레이 ─────────────────────────────────────────────────
+
+class _CountdownOverlay(QWidget):
+    """Record 버튼 클릭 후 3-2-1 카운트다운을 화면 중앙에 표시하는 오버레이"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._number = 3
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setVisible(False)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # 반투명 어두운 배경
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 160))
+
+        # 원
+        cx, cy = self.width() // 2, self.height() // 2
+        r = 90
+        painter.setBrush(QColor(211, 47, 47, 230))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
+
+        # 숫자
+        font = QFont()
+        font.setPointSize(72)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, str(self._number))
+
+        painter.end()
+
+    async def run(self):
+        """3 → 2 → 1 순서로 1초씩 표시 후 숨김"""
+        if parent := self.parent():
+            self.setGeometry(parent.rect())
+        self.raise_()
+        self.show()
+        for n in (3, 2, 1):
+            self._number = n
+            self.update()
+            await asyncio.sleep(1.0)
+        self.hide()
+
+
 # ─── 메인 패널 ────────────────────────────────────────────────────────────────
 
 class DataCollectionPanel(QWidget):
@@ -151,6 +199,11 @@ class DataCollectionPanel(QWidget):
         self._joint_rows: list[_JointRow] = []
 
         self._setup_ui()
+        self._countdown_overlay = _CountdownOverlay(self)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._countdown_overlay.setGeometry(self.rect())
 
     # ------------------------------------------------------------------
     # UI 구성
@@ -380,6 +433,9 @@ class DataCollectionPanel(QWidget):
         self._progress_bar.setMaximum(episodes)
         self._progress_bar.setValue(0)
         self._progress_label.setText(f"0 / {episodes}")
+
+        # 3-2-1 카운트다운
+        await self._countdown_overlay.run()
 
         # 카메라 구독
         self._frame_subscriptions = []
