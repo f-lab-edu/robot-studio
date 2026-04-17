@@ -15,6 +15,7 @@ import {
   getDatasetInfo,
   getEpisodeFrames,
   getVideoUrls,
+  getVideoProxyUrl,
   type DatasetInfo,
   type EpisodeFramesResponse,
   type FrameData,
@@ -136,11 +137,17 @@ export default function EpisodeDetailPage() {
                 if (i === 0) (masterRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
                 else if (el) slaveRefs.current[i - 1] = el;
               }}
-              src={v.url}
+              src={getVideoProxyUrl(name ?? "", episodeIndex, v.camera)}
               preload="auto"
               width={480}
               style={{ display: "block", minHeight: 270, background: "#000" }}
               controls={i === 0}
+              onError={(e) => {
+                const video = e.currentTarget;
+                console.error(`Video load error [${v.camera}]`, video.error);
+                const errMsg = video.error ? `code=${video.error.code} ${video.error.message}` : "unknown";
+                video.insertAdjacentHTML("afterend", `<p style="color:red">영상 로드 실패: ${errMsg}</p>`);
+              }}
             />
           </div>
         ))}
