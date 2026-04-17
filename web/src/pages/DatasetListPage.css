@@ -1,0 +1,119 @@
+.ds-list-page {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.ds-list-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.ds-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.ds-list-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.ds-state-msg {
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+.ds-state-error {
+  color: var(--danger);
+}
+
+/* ── 테이블 ─────────────────────────────────── */
+.ds-table {
+  overflow: hidden;
+}
+
+.ds-table-header,
+.ds-row {
+  display: grid;
+  grid-template-columns: 2fr 100px 60px 80px 100px 100px 80px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.ds-table-header {
+  padding-top: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: var(--nav-height);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+}
+
+.ds-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-row {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ds-row:last-child {
+  border-bottom: none;
+}
+
+.ds-row:hover {
+  background: var(--purple-hover);
+}
+
+.ds-row:hover .ds-view-btn {
+  opacity: 1;
+}
+
+.ds-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-num {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.ds-row-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ds-view-btn {
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--purple);
+  background: var(--purple-bg);
+  border: 1px solid var(--purple-border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.ds-view-btn:hover {
+  background: rgba(124, 58, 237, 0.12);
+}
