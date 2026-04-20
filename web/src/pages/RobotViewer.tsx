@@ -1,6 +1,6 @@
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Grid } from "@react-three/drei";
-import { useEffect, useRef, useState } from "react";
+import { OrbitControls, Grid, Line } from "@react-three/drei";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import URDFLoader from "urdf-loader";
 import type { URDFRobot } from "urdf-loader";
@@ -23,15 +23,18 @@ function servoToRad(value: number): number {
 
 interface RobotModelProps {
   jointPositions: Record<string, number>;
-  onEndEffectorPos?: (pos: [number, number, number]) => void;
-  trailPositions: [number, number, number][];
   showTrail: boolean;
+  isPlaying: boolean;
+  trailKey: number;
 }
 
-function RobotModel({ jointPositions, onEndEffectorPos, trailPositions, showTrail }: RobotModelProps) {
+function RobotModel({ jointPositions, showTrail, isPlaying, trailKey }: RobotModelProps) {
   const { scene } = useThree();
   const robotRef = useRef<URDFRobot | null>(null);
   const [robotLoaded, setRobotLoaded] = useState(false);
+  const [trailPoints, setTrailPoints] = useState<[number, number, number][]>([]);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
 
   useEffect(() => {
     const loader = new URDFLoader();
@@ -42,9 +45,9 @@ function RobotModel({ jointPositions, onEndEffectorPos, trailPositions, showTrai
         (geom) => {
           geom.computeVertexNormals();
           const mat = new THREE.MeshPhongMaterial({
-            color: 0xffd124,
-            specular: 0x333333,
-            shininess: 40,
+            color: 0x9b59b6,
+            specular: 0x444444,
+            shininess: 60,
           });
           done(new THREE.Mesh(geom, mat));
         },
@@ -70,8 +73,12 @@ function RobotModel({ jointPositions, onEndEffectorPos, trailPositions, showTrai
   }, [scene]);
 
   useEffect(() => {
+    setTrailPoints([]);
+  }, [trailKey]);
+
+  useEffect(() => {
     const robot = robotRef.current;
-    if (!robot) return;
+    if (!robot || !robotLoaded) return;
 
     Object.entries(jointPositions).forEach(([datasetName, angle]) => {
       const urdfJointName = JOINT_MAP[datasetName];
@@ -80,28 +87,55 @@ function RobotModel({ jointPositions, onEndEffectorPos, trailPositions, showTrai
       }
     });
 
-    if (onEndEffectorPos) {
+    if (showTrail && isPlayingRef.current) {
       const endLink = robot.links["jaw"] ?? robot.links["gripper"];
       if (endLink) {
         const pos = new THREE.Vector3();
         endLink.getWorldPosition(pos);
-        onEndEffectorPos([pos.x, pos.y, pos.z]);
+        setTrailPoints((prev) => {
+          const next: [number, number, number][] = [...prev, [pos.x, pos.y, pos.z]];
+          // 슬라이딩 윈도우: 최근 30프레임만 유지해 꼬리처럼 사라짐
+          return next.length > 30 ? next.slice(-30) : next;
+        });
       }
     }
-  }, [jointPositions, onEndEffectorPos, robotLoaded]);
+  }, [jointPositions, showTrail, robotLoaded]);
+
+  // CatmullRomCurve3 보간 + 그라데이션 버텍스 컬러 계산
+  const trailData = useMemo(() => {
+    if (trailPoints.length < 2) return null;
+    const vectors = trailPoints.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+    const curve = new THREE.CatmullRomCurve3(vectors);
+    const pts = curve.getPoints(Math.min(trailPoints.length * 6, 500));
+    const n = pts.length;
+    const points: [number, number, number][] = [];
+    const colors: [number, number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const ease = t * t;
+      points.push([pts[i].x, pts[i].y, pts[i].z]);
+      colors.push([ease * 0.05, ease * 0.95, ease * 1.0]);
+    }
+    const tip = trailPoints[trailPoints.length - 1];
+    return { points, colors, tip };
+  }, [trailPoints]);
 
   return (
     <>
-      {showTrail && trailPositions.length > 1 && (
-        <line>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              args={[new Float32Array(trailPositions.flat()), 3]}
-            />
-          </bufferGeometry>
-          <lineBasicMaterial color="#f97316" linewidth={2} />
-        </line>
+      {showTrail && trailData && (
+        <>
+          <Line
+            points={trailData.points}
+            vertexColors={trailData.colors}
+            lineWidth={7.5}
+            toneMapped={false}
+          />
+          {/* 현재 위치 발광 구체 */}
+          <mesh position={trailData.tip}>
+            <sphereGeometry args={[0.005, 10, 10]} />
+            <meshBasicMaterial color="#aaf8ff" toneMapped={false} />
+          </mesh>
+        </>
       )}
     </>
   );
@@ -109,16 +143,16 @@ function RobotModel({ jointPositions, onEndEffectorPos, trailPositions, showTrai
 
 interface RobotViewerProps {
   jointPositions: Record<string, number>;
-  trailPositions: [number, number, number][];
   showTrail: boolean;
-  onEndEffectorPos?: (pos: [number, number, number]) => void;
+  isPlaying: boolean;
+  trailKey: number;
 }
 
 export default function RobotViewer({
   jointPositions,
-  trailPositions,
   showTrail,
-  onEndEffectorPos,
+  isPlaying,
+  trailKey,
 }: RobotViewerProps) {
   return (
     <Canvas
@@ -139,9 +173,9 @@ export default function RobotViewer({
       <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
       <RobotModel
         jointPositions={jointPositions}
-        trailPositions={trailPositions}
         showTrail={showTrail}
-        onEndEffectorPos={onEndEffectorPos}
+        isPlaying={isPlaying}
+        trailKey={trailKey}
       />
     </Canvas>
   );
