@@ -446,55 +446,10 @@
   white-space: nowrap;
 }
 
-/* ── 탭 바 ───────────────────────────────────── */
-.dd-tab-bar {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 0 24px;
-  flex-shrink: 0;
-}
-
-.dd-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-3);
-  cursor: pointer;
-  font-family: inherit;
-  transition: color 0.12s, border-color 0.12s;
-  margin-bottom: -1px;
-}
-
-.dd-tab:hover {
-  color: var(--text-1);
-}
-
-.dd-tab.active {
-  color: var(--purple);
-  border-bottom-color: var(--purple);
-  font-weight: 600;
-}
-
-/* ── 3D 뷰어 ─────────────────────────────────── */
-.dd-3d-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-}
-
-.dd-3d-canvas {
-  flex: 1;
-  min-height: 400px;
-  border-radius: var(--radius);
+/* ── 3D 비디오 카드 ───────────────────────────── */
+.dd-3d-video-canvas {
+  aspect-ratio: 4 / 3;
   overflow: hidden;
+  background: #0d1117;
 }
 
