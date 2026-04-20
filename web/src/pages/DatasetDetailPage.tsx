@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   LineChart,
@@ -27,6 +27,7 @@ import "./DatasetDetailPage.css";
 
 const STATE_COLORS = ["#7c3aed", "#2563eb", "#0891b2", "#059669", "#d97706", "#dc2626"];
 const ACTION_COLORS = ["#c4b5fd", "#93c5fd", "#67e8f9", "#6ee7b7", "#fcd34d", "#fca5a5"];
+const CHART_GROUP_SIZE = 3;
 
 export default function DatasetDetailPage() {
   const { name } = useParams<{ name: string }>();
@@ -45,36 +46,33 @@ export default function DatasetDetailPage() {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [currentFrame, setCurrentFrame] = useState<FrameData | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [hiddenCameras, setHiddenCameras] = useState<Set<string>>(new Set());
 
-  const masterRef = useRef<HTMLVideoElement | null>(null);
-  const slaveRefs = useRef<HTMLVideoElement[]>([]);
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
-  // 데이터셋 메타 + 에피소드 목록 로드
   useEffect(() => {
     if (!name) return;
     setLoadingMeta(true);
     Promise.all([getDatasetInfo(name), listEpisodes(name)])
-      .then(([i, eps]) => {
-        setInfo(i);
-        setEpisodes(eps);
-      })
+      .then(([i, eps]) => { setInfo(i); setEpisodes(eps); })
       .catch((e) => setMetaError(e.message))
       .finally(() => setLoadingMeta(false));
   }, [name]);
 
-  // 선택된 에피소드 데이터 로드
   useEffect(() => {
     if (!name || episodes.length === 0) return;
     setLoadingEpisode(true);
     setEpisodeError(null);
     setCurrentTime(0);
     setCurrentFrame(null);
-    slaveRefs.current = [];
+    setIsPlaying(false);
+    setDuration(0);
+    setHiddenCameras(new Set());
+    videoRefs.current.clear();
 
-    Promise.all([
-      getVideoUrls(name, selectedIdx),
-      getEpisodeFrames(name, selectedIdx),
-    ])
+    Promise.all([getVideoUrls(name, selectedIdx), getEpisodeFrames(name, selectedIdx)])
       .then(([urls, frames]) => {
         setVideoUrls(urls);
         setFramesData(frames);
@@ -84,16 +82,19 @@ export default function DatasetDetailPage() {
       .finally(() => setLoadingEpisode(false));
   }, [name, selectedIdx, episodes.length]);
 
-  // 마스터 비디오 동기화
-  useEffect(() => {
-    const master = masterRef.current;
-    if (!master || !framesData) return;
+  const firstCameraKey = videoUrls.find((v) => !hiddenCameras.has(v.camera))?.camera;
 
+  useEffect(() => {
+    const masterVid = firstCameraKey ? videoRefs.current.get(firstCameraKey) : null;
+    if (!masterVid || !framesData) return;
+
+    const onLoadedMetadata = () => setDuration(masterVid.duration);
     const onTimeUpdate = () => {
-      const t = master.currentTime;
+      const t = masterVid.currentTime;
       setCurrentTime(t);
-      slaveRefs.current.forEach((slave) => {
-        if (slave && Math.abs(slave.currentTime - t) > 0.1) slave.currentTime = t;
+      videoRefs.current.forEach((vid, cam) => {
+        if (cam !== firstCameraKey && Math.abs(vid.currentTime - t) > 0.1)
+          vid.currentTime = t;
       });
       const frameIdx = Math.min(
         Math.floor(t * framesData.fps),
@@ -101,34 +102,96 @@ export default function DatasetDetailPage() {
       );
       if (frameIdx >= 0) setCurrentFrame(framesData.frames[frameIdx]);
     };
-
-    const onPlay = () => slaveRefs.current.forEach((s) => s?.play());
-    const onPause = () => slaveRefs.current.forEach((s) => s?.pause());
-    const onSeeked = () =>
-      slaveRefs.current.forEach((s) => {
-        if (s) s.currentTime = master.currentTime;
+    const onPlay = () => {
+      setIsPlaying(true);
+      videoRefs.current.forEach((vid, cam) => { if (cam !== firstCameraKey) vid.play(); });
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      videoRefs.current.forEach((vid, cam) => { if (cam !== firstCameraKey) vid.pause(); });
+    };
+    const onSeeked = () => {
+      videoRefs.current.forEach((vid, cam) => {
+        if (cam !== firstCameraKey) vid.currentTime = masterVid.currentTime;
       });
+    };
 
-    master.addEventListener("timeupdate", onTimeUpdate);
-    master.addEventListener("play", onPlay);
-    master.addEventListener("pause", onPause);
-    master.addEventListener("seeked", onSeeked);
+    masterVid.addEventListener("loadedmetadata", onLoadedMetadata);
+    masterVid.addEventListener("timeupdate", onTimeUpdate);
+    masterVid.addEventListener("play", onPlay);
+    masterVid.addEventListener("pause", onPause);
+    masterVid.addEventListener("seeked", onSeeked);
 
     return () => {
-      master.removeEventListener("timeupdate", onTimeUpdate);
-      master.removeEventListener("play", onPlay);
-      master.removeEventListener("pause", onPause);
-      master.removeEventListener("seeked", onSeeked);
+      masterVid.removeEventListener("loadedmetadata", onLoadedMetadata);
+      masterVid.removeEventListener("timeupdate", onTimeUpdate);
+      masterVid.removeEventListener("play", onPlay);
+      masterVid.removeEventListener("pause", onPause);
+      masterVid.removeEventListener("seeked", onSeeked);
     };
-  }, [framesData]);
+  }, [framesData, firstCameraKey]);
 
-  const selectEpisode = (idx: number) => {
-    setSearchParams({ episode: String(idx) });
+  const selectEpisode = (idx: number) => setSearchParams({ episode: String(idx) });
+
+  const togglePlayPause = useCallback(() => {
+    const vid = firstCameraKey ? videoRefs.current.get(firstCameraKey) : null;
+    if (!vid) return;
+    if (vid.paused) vid.play();
+    else vid.pause();
+  }, [firstCameraKey]);
+
+  const handleSeek = useCallback(
+    (ratio: number) => {
+      const time = ratio * duration;
+      videoRefs.current.forEach((vid) => { vid.currentTime = time; });
+      setCurrentTime(time);
+      if (framesData) {
+        const frameIdx = Math.min(
+          Math.floor(time * framesData.fps),
+          framesData.frames.length - 1
+        );
+        if (frameIdx >= 0) setCurrentFrame(framesData.frames[frameIdx]);
+      }
+    },
+    [duration, framesData]
+  );
+
+  const stepFrame = useCallback(
+    (delta: number) => {
+      if (!framesData || duration === 0) return;
+      const newTime = Math.max(
+        0,
+        Math.min(duration, currentTime + (delta / framesData.fps))
+      );
+      handleSeek(newTime / duration);
+    },
+    [framesData, duration, currentTime, handleSeek]
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.code === "Space") { e.preventDefault(); togglePlayPause(); }
+      if (e.code === "ArrowUp") { e.preventDefault(); selectEpisode(Math.min(selectedIdx + 1, episodes.length - 1)); }
+      if (e.code === "ArrowDown") { e.preventDefault(); selectEpisode(Math.max(selectedIdx - 1, 0)); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [togglePlayPause, selectedIdx, episodes.length]);
+
+  const handleFullscreen = (camera: string) => {
+    const vid = videoRefs.current.get(camera);
+    if (vid?.requestFullscreen) vid.requestFullscreen();
   };
 
   const jointNames =
     info?.features["observation.state"]?.names ??
     ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"];
+
+  const jointGroups: string[][] = [];
+  for (let i = 0; i < jointNames.length; i += CHART_GROUP_SIZE) {
+    jointGroups.push(jointNames.slice(i, i + CHART_GROUP_SIZE));
+  }
 
   const chartData = (() => {
     if (!framesData) return [];
@@ -149,6 +212,7 @@ export default function DatasetDetailPage() {
   })();
 
   const selectedEpisode = episodes.find((ep) => ep.episode_index === selectedIdx);
+  const visibleVideos = videoUrls.filter((v) => !hiddenCameras.has(v.camera));
 
   if (loadingMeta) {
     return (
@@ -178,21 +242,31 @@ export default function DatasetDetailPage() {
         <Link to="/datasets" className="navbar-logo">⬡ Robot Studio</Link>
         <span className="dd-nav-sep">·</span>
         <span className="dd-nav-name">{info.name}</span>
-        <div className="dd-nav-badges">
-          <span className="badge badge-purple">{info.robot_type}</span>
-          <span className="badge badge-gray">{info.fps} fps</span>
-          <span className="badge badge-gray">{info.total_episodes} episodes</span>
-          <span className="badge badge-gray">{info.total_frames.toLocaleString()} frames</span>
-        </div>
+        <span className="badge badge-purple" style={{ marginLeft: 8 }}>{info.robot_type}</span>
       </nav>
 
       <div className="dd-layout">
-        {/* 왼쪽 사이드바 */}
         <aside className="dd-sidebar">
+          <div className="dd-sidebar-stats">
+            <div className="dd-sidebar-stat">
+              <span className="label">Frames</span>
+              <span className="dd-stat-val">{info.total_frames.toLocaleString()}</span>
+            </div>
+            <div className="dd-sidebar-stat">
+              <span className="label">Episodes</span>
+              <span className="dd-stat-val">{info.total_episodes}</span>
+            </div>
+            <div className="dd-sidebar-stat">
+              <span className="label">FPS</span>
+              <span className="dd-stat-val">{info.fps}</span>
+            </div>
+          </div>
+
           <div className="dd-sidebar-header">
             <span className="label">Episodes</span>
             <span className="badge badge-gray">{episodes.length}</span>
           </div>
+
           <div className="dd-sidebar-list">
             {episodes.map((ep) => (
               <button
@@ -201,7 +275,7 @@ export default function DatasetDetailPage() {
                 onClick={() => selectEpisode(ep.episode_index)}
               >
                 <div className="dd-ep-top">
-                  <span className="dd-ep-index">Ep #{ep.episode_index}</span>
+                  <span className="dd-ep-index">Episode {ep.episode_index}</span>
                   <span className={`dd-ep-status ${ep.success ? "success" : "fail"}`}>
                     {ep.success ? "✓" : "✗"}
                   </span>
@@ -215,176 +289,227 @@ export default function DatasetDetailPage() {
           </div>
         </aside>
 
-        {/* 메인 콘텐츠 */}
-        <main className="dd-main">
-          {loadingEpisode && <p className="dd-state-msg">Loading episode...</p>}
-          {episodeError && (
-            <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
-          )}
+        <div className="dd-main-wrapper">
+          <main className="dd-main">
+            {loadingEpisode && <p className="dd-state-msg">Loading episode...</p>}
+            {episodeError && (
+              <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
+            )}
 
-          {!loadingEpisode && !episodeError && (
-            <>
-              {/* 에피소드 헤더 */}
-              <div className="dd-ep-header">
-                <h2 className="dd-ep-title">Episode #{selectedIdx}</h2>
-                {selectedEpisode && (
-                  <span
-                    className={`dd-ep-badge ${selectedEpisode.success ? "success" : "fail"}`}
-                  >
-                    {selectedEpisode.success ? "Success" : "Fail"}
-                  </span>
-                )}
-                {selectedEpisode?.language_instruction && (
-                  <span className="dd-ep-instr-tag">
-                    {selectedEpisode.language_instruction}
-                  </span>
-                )}
-              </div>
-
-              {/* 비디오 섹션 */}
-              {videoUrls.length > 0 && (
-                <section className="dd-section glass-card">
-                  <div className="dd-section-title">
-                    <span className="label">Video</span>
-                    {videoUrls.length > 1 && (
-                      <span className="dd-sync-note">
-                        ※ 상단 영상 컨트롤로 재생 시 나머지 영상 자동 동기화
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className="dd-video-grid"
-                    style={{
-                      gridTemplateColumns: `repeat(${Math.min(videoUrls.length, 3)}, 1fr)`,
-                    }}
-                  >
-                    {videoUrls.map((v, i) => (
-                      <div key={v.camera} className="dd-video-wrap">
-                        <span className="dd-camera-label label">
-                          {v.camera.replace("observation.images.", "")}
-                        </span>
-                        <video
-                          ref={(el) => {
-                            if (i === 0) masterRef.current = el;
-                            else if (el) slaveRefs.current[i - 1] = el;
-                          }}
-                          src={getVideoProxyUrl(name ?? "", selectedIdx, v.camera)}
-                          preload="auto"
-                          className="dd-video"
-                          controls={i === 0}
-                          onError={(e) => {
-                            const vid = e.currentTarget;
-                            console.error(`Video error [${v.camera}]`, vid.error);
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* 모터 데이터 섹션 */}
-              {framesData && (
-                <section className="dd-section glass-card">
-                  <div className="dd-section-title">
-                    <span className="label">Motor Data</span>
-                    {currentFrame && (
-                      <span className="dd-frame-badge">
-                        Frame {currentFrame.frame_index}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 조인트 테이블 */}
-                  <div className="dd-joint-table-wrap">
-                    <table className="dd-joint-table">
-                      <thead>
-                        <tr>
-                          <th>Joint</th>
-                          <th>State (follower)</th>
-                          <th>Action (leader)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {jointNames.map((jname, i) => (
-                          <tr key={jname}>
-                            <td className="dd-joint-name">{jname}</td>
-                            <td className="dd-joint-val">
-                              {currentFrame
-                                ? (currentFrame.observation_state[i]?.toFixed(1) ?? "—")
-                                : "—"}
-                            </td>
-                            <td className="dd-joint-val">
-                              {currentFrame
-                                ? (currentFrame.action[i]?.toFixed(1) ?? "—")
-                                : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* 차트 */}
-                  {chartData.length > 0 && (
-                    <div className="dd-chart-wrap">
-                      <p className="dd-chart-note label">Trajectory — state: solid / action: dashed</p>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                          <XAxis
-                            dataKey="time"
-                            label={{ value: "time (s)", position: "insideBottomRight", offset: -8 }}
-                            tick={{ fontSize: 11, fill: "var(--text-3)" }}
-                          />
-                          <YAxis tick={{ fontSize: 11, fill: "var(--text-3)" }} />
-                          <Tooltip
-                            contentStyle={{
-                              background: "rgba(255,255,255,0.95)",
-                              border: "1px solid var(--border)",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Legend wrapperStyle={{ fontSize: 11 }} />
-                          <ReferenceLine
-                            x={parseFloat(currentTime.toFixed(2))}
-                            stroke="var(--purple)"
-                            strokeWidth={2}
-                            label={{ value: "▶", fill: "var(--purple)", fontSize: 11 }}
-                          />
-                          {jointNames.map((jname, i) => (
-                            <Line
-                              key={`state_${jname}`}
-                              type="monotone"
-                              dataKey={`state_${jname}`}
-                              stroke={STATE_COLORS[i % STATE_COLORS.length]}
-                              dot={false}
-                              strokeWidth={1.5}
-                              name={`state: ${jname}`}
-                            />
-                          ))}
-                          {jointNames.map((jname, i) => (
-                            <Line
-                              key={`action_${jname}`}
-                              type="monotone"
-                              dataKey={`action_${jname}`}
-                              stroke={ACTION_COLORS[i % ACTION_COLORS.length]}
-                              dot={false}
-                              strokeWidth={1.5}
-                              strokeDasharray="4 2"
-                              name={`action: ${jname}`}
-                            />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+            {!loadingEpisode && !episodeError && (
+              <>
+                <div className="dd-ep-header">
+                  <span className="dd-nav-name">{info.name}</span>
+                  <span className="dd-nav-sep">·</span>
+                  <span className="dd-ep-title">episode {selectedIdx}</span>
+                  {selectedEpisode && (
+                    <span className={`dd-ep-badge ${selectedEpisode.success ? "success" : "fail"}`}>
+                      {selectedEpisode.success ? "Success" : "Fail"}
+                    </span>
                   )}
-                </section>
-              )}
-            </>
+                </div>
+
+                {videoUrls.length > 0 && (
+                  <div>
+                    {hiddenCameras.size > 0 && (
+                      <button
+                        className="dd-restore-cameras"
+                        onClick={() => setHiddenCameras(new Set())}
+                      >
+                        + 숨겨진 카메라 {hiddenCameras.size}개 표시
+                      </button>
+                    )}
+                    <div className="dd-video-grid">
+                      {visibleVideos.map((v) => (
+                        <div key={v.camera} className="dd-video-card glass-card">
+                          <div className="dd-video-card-header">
+                            <span className="dd-camera-label label">
+                              {v.camera.replace("observation.images.", "")}
+                            </span>
+                            <div className="dd-video-card-actions">
+                              <button
+                                className="dd-video-action-btn"
+                                onClick={() => handleFullscreen(v.camera)}
+                                title="전체화면"
+                              >
+                                ⛶
+                              </button>
+                              <button
+                                className="dd-video-action-btn"
+                                onClick={() =>
+                                  setHiddenCameras((prev) => new Set([...prev, v.camera]))
+                                }
+                                title="닫기"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <video
+                            ref={(el) => {
+                              if (el) videoRefs.current.set(v.camera, el);
+                              else videoRefs.current.delete(v.camera);
+                            }}
+                            src={getVideoProxyUrl(name ?? "", selectedIdx, v.camera)}
+                            preload="auto"
+                            className="dd-video"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEpisode?.language_instruction && (
+                  <div className="dd-lang-instruction glass-card">
+                    <span className="label">Language Instruction</span>
+                    <p className="dd-lang-text">{selectedEpisode.language_instruction}</p>
+                  </div>
+                )}
+
+                {framesData && (
+                  <div className="dd-data-grid">
+                    <div className="dd-data-cell glass-card">
+                      <div className="dd-data-cell-header">
+                        <span className="label">Joint State</span>
+                        {currentFrame && (
+                          <span className="dd-frame-badge">
+                            Frame {currentFrame.frame_index}
+                          </span>
+                        )}
+                      </div>
+                      <div className="dd-joint-table-wrap">
+                        <table className="dd-joint-table">
+                          <thead>
+                            <tr>
+                              <th>Joint</th>
+                              <th>State</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {jointNames.map((jname, i) => (
+                              <tr key={jname}>
+                                <td className="dd-joint-name">{jname}</td>
+                                <td className="dd-joint-val dd-val-state">
+                                  {currentFrame
+                                    ? (currentFrame.observation_state[i]?.toFixed(2) ?? "—")
+                                    : "—"}
+                                </td>
+                                <td className="dd-joint-val dd-val-action">
+                                  {currentFrame
+                                    ? (currentFrame.action[i]?.toFixed(2) ?? "—")
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {chartData.length > 0 &&
+                      jointGroups.map((group, gi) => {
+                        const groupOffset = gi * CHART_GROUP_SIZE;
+                        return (
+                          <div key={gi} className="dd-data-cell glass-card">
+                            <div className="dd-data-cell-header">
+                              <span className="label dd-chart-group-label">
+                                {group.join(", ")}
+                              </span>
+                              <span className="dd-chart-hint label">━ state · ╌ action</span>
+                            </div>
+                            <ResponsiveContainer width="100%" height={200}>
+                              <LineChart
+                                data={chartData}
+                                margin={{ top: 4, right: 8, bottom: 4, left: -16 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                <XAxis
+                                  dataKey="time"
+                                  tick={{ fontSize: 10, fill: "var(--text-3)" }}
+                                />
+                                <YAxis tick={{ fontSize: 10, fill: "var(--text-3)" }} />
+                                <Tooltip
+                                  contentStyle={{
+                                    background: "rgba(255,255,255,0.95)",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: 8,
+                                    fontSize: 11,
+                                  }}
+                                />
+                                <Legend wrapperStyle={{ fontSize: 10 }} />
+                                <ReferenceLine
+                                  x={currentFrame
+                                    ? parseFloat((currentFrame.frame_index / framesData.fps).toFixed(2))
+                                    : 0}
+                                  stroke="var(--orange)"
+                                  strokeWidth={1.5}
+                                />
+                                {group.flatMap((jname, i) => {
+                                  const ci = (groupOffset + i) % STATE_COLORS.length;
+                                  return [
+                                    <Line
+                                      key={`state_${jname}`}
+                                      type="monotone"
+                                      dataKey={`state_${jname}`}
+                                      stroke={STATE_COLORS[ci]}
+                                      dot={false}
+                                      strokeWidth={1.5}
+                                      name={jname}
+                                      isAnimationActive={false}
+                                    />,
+                                    <Line
+                                      key={`action_${jname}`}
+                                      type="monotone"
+                                      dataKey={`action_${jname}`}
+                                      stroke={ACTION_COLORS[ci]}
+                                      dot={false}
+                                      strokeWidth={1.5}
+                                      strokeDasharray="4 2"
+                                      name={`${jname}(a)`}
+                                      isAnimationActive={false}
+                                    />,
+                                  ];
+                                })}
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+
+          {framesData && !loadingEpisode && (
+            <div className="dd-playbar">
+              <button className="dd-playbar-btn" onClick={() => stepFrame(-1)} title="이전 프레임">
+                ⏮
+              </button>
+              <button className="dd-playbar-btn dd-play-btn" onClick={togglePlayPause}>
+                {isPlaying ? "⏸" : "▶"}
+              </button>
+              <button className="dd-playbar-btn" onClick={() => stepFrame(1)} title="다음 프레임">
+                ⏭
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.001}
+                value={duration > 0 ? currentTime / duration : 0}
+                onChange={(e) => handleSeek(Number(e.target.value))}
+                className="dd-scrubber"
+              />
+              <span className="dd-frame-counter">
+                {currentFrame?.frame_index ?? 0} / {framesData.frames.length - 1}
+              </span>
+              <span className="dd-key-hint">Space: play/pause · ↑↓: episode</span>
+            </div>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );
