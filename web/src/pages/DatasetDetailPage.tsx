@@ -250,7 +250,7 @@ export default function DatasetDetailPage() {
     return (
       <div className="dd-page">
         <nav className="navbar">
-          <Link to="/datasets" className="navbar-logo">⬡ Robot Studio</Link>
+          <Link to="/datasets"><img src="/logo.png" alt="Robot Studio" className="navbar-logo" /></Link>
         </nav>
         <p className="dd-state-msg">Loading...</p>
       </div>
@@ -261,7 +261,7 @@ export default function DatasetDetailPage() {
     return (
       <div className="dd-page">
         <nav className="navbar">
-          <Link to="/datasets" className="navbar-logo">⬡ Robot Studio</Link>
+          <Link to="/datasets"><img src="/logo.png" alt="Robot Studio" className="navbar-logo" /></Link>
         </nav>
         <p className="dd-state-msg dd-state-error">{metaError ?? "Not found"}</p>
       </div>
@@ -271,7 +271,7 @@ export default function DatasetDetailPage() {
   return (
     <div className="dd-page">
       <nav className="navbar">
-        <Link to="/datasets" className="navbar-logo">⬡ Robot Studio</Link>
+        <Link to="/datasets"><img src="/logo.png" alt="Robot Studio" className="navbar-logo" /></Link>
         <span className="dd-nav-sep">·</span>
         <span className="dd-nav-name">{info.name}</span>
         <span className="badge badge-purple" style={{ marginLeft: 8 }}>{info.robot_type}</span>
