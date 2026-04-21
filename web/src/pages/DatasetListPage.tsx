@@ -112,7 +112,12 @@ function ProfileSidebar() {
   if (editing) {
     return (
       <aside className="profile-sidebar">
-        <Avatar name={draft.name} />
+        <div className="profile-avatar-wrap">
+          <Avatar name={draft.name} />
+          <div className="profile-avatar-overlay">
+            <span className="profile-avatar-edit-label">Edit</span>
+          </div>
+        </div>
 
         <div className="profile-form">
           <label className="profile-form-label">Name</label>
