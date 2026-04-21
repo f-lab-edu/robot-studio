@@ -45,7 +45,7 @@ interface UserProfile {
 }
 
 const DEFAULT_PROFILE: UserProfile = {
-  name: "GomSon-E",
+  name: "User-Name",
   bio: "",
   pronouns: "",
   company: "",
@@ -296,7 +296,7 @@ export default function DatasetListPage() {
   return (
     <div className="ds-list-page">
       <nav className="navbar">
-        <span className="navbar-logo">⬡ Robot Studio</span>
+        <img src="/logo.png" alt="Robot Studio" className="navbar-logo" />
       </nav>
 
       <div className="ds-layout">
