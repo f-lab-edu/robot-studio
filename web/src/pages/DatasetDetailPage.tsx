@@ -310,9 +310,6 @@ export default function DatasetDetailPage() {
                     {ep.success ? "✓" : "✗"}
                   </span>
                 </div>
-                {ep.language_instruction && (
-                  <span className="dd-ep-instruction">{ep.language_instruction}</span>
-                )}
                 <span className="dd-ep-frames">{ep.length} frames</span>
               </button>
             ))}
@@ -349,17 +346,6 @@ export default function DatasetDetailPage() {
 
               {!loadingEpisode && !episodeError && (
                 <>
-                  <div className="dd-ep-header">
-                    <span className="dd-nav-name">{info.name}</span>
-                    <span className="dd-nav-sep">·</span>
-                    <span className="dd-ep-title">episode {selectedIdx}</span>
-                    {selectedEpisode && (
-                      <span className={`dd-ep-badge ${selectedEpisode.success ? "success" : "fail"}`}>
-                        {selectedEpisode.success ? "Success" : "Fail"}
-                      </span>
-                    )}
-                  </div>
-
                   <div>
                     {(hiddenCameras.size > 0 || !show3DCard) && (
                       <button
@@ -446,12 +432,6 @@ export default function DatasetDetailPage() {
                     </div>
                   </div>
 
-                  {selectedEpisode?.language_instruction && (
-                    <div className="dd-lang-instruction glass-card">
-                      <span className="label">Language Instruction</span>
-                      <p className="dd-lang-text">{selectedEpisode.language_instruction}</p>
-                    </div>
-                  )}
 
                   {framesData && (
                     <div className="dd-data-grid">
