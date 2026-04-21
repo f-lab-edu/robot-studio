@@ -56,6 +56,7 @@ export default function DatasetDetailPage() {
   const [playbackEnded, setPlaybackEnded] = useState(false);
   const playbackEndedRef = useRef(false);
   const [show3DCard, setShow3DCard] = useState(true);
+  const [show3DHint, setShow3DHint] = useState(false);
   const playIntervalRef = useRef<number | null>(null);
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
@@ -84,6 +85,7 @@ export default function DatasetDetailPage() {
     setPlaybackEnded(false);
     playbackEndedRef.current = false;
     setShow3DCard(true);
+    setShow3DHint(false);
     if (playIntervalRef.current !== null) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
@@ -362,22 +364,38 @@ export default function DatasetDetailPage() {
                             <span className="dd-camera-label label">3D Replay</span>
                             <div className="dd-video-card-actions">
                               <button
+                                className={`dd-video-action-btn${show3DHint ? ' active' : ''}`}
+                                onClick={() => setShow3DHint((v) => !v)}
+                                title="조작 방법"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 4a2 2 0 1 1 2 2v1.5"/><circle cx="6" cy="9.5" r=".5" fill="currentColor" stroke="none"/></svg>
+                              </button>
+                              <button
                                 className="dd-video-action-btn"
                                 onClick={() => setActiveTab('3d-replay')}
                                 title="3D Replay 탭으로 열기"
                               >
-                                ⛶
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1H11v3.5M4.5 11H1V7.5M11 1 6 6M1 11l5-5"/></svg>
                               </button>
                               <button
                                 className="dd-video-action-btn"
                                 onClick={() => setShow3DCard(false)}
                                 title="닫기"
                               >
-                                ×
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
                               </button>
                             </div>
                           </div>
                           <div className="dd-3d-video-canvas">
+                            {show3DHint && (
+                              <div className="dd-3d-hint" onClick={() => setShow3DHint(false)}>
+                                <ol className="dd-3d-hint-inner">
+                                  <li className="dd-3d-hint-row"><span className="dd-3d-hint-key">좌클릭 드래그</span><span className="dd-3d-hint-desc">회전</span></li>
+                                  <li className="dd-3d-hint-row"><span className="dd-3d-hint-key">휠 스크롤</span><span className="dd-3d-hint-desc">확대 / 축소</span></li>
+                                  <li className="dd-3d-hint-row"><span className="dd-3d-hint-key">우클릭 드래그</span><span className="dd-3d-hint-desc">이동</span></li>
+                                </ol>
+                              </div>
+                            )}
                             <RobotViewer
                               jointPositions={
                                 currentFrame
@@ -405,7 +423,7 @@ export default function DatasetDetailPage() {
                                 onClick={() => handleFullscreen(v.camera)}
                                 title="전체화면"
                               >
-                                ⛶
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1H11v3.5M4.5 11H1V7.5M11 1 6 6M1 11l5-5"/></svg>
                               </button>
                               <button
                                 className="dd-video-action-btn"
@@ -414,7 +432,7 @@ export default function DatasetDetailPage() {
                                 }
                                 title="닫기"
                               >
-                                ×
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
                               </button>
                             </div>
                           </div>
