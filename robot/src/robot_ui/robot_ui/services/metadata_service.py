@@ -7,7 +7,7 @@ from .parquet_service import JOINT_NAMES
 
 INFO_TEMPLATE = {
     "codebase_version": "v2.0",
-    "robot_type": "so100",
+    "robot_type": "SO-ARM101",
     "fps": 30,
     "features": {
         "observation.state": {"dtype": "float32", "shape": [6], "names": JOINT_NAMES},
