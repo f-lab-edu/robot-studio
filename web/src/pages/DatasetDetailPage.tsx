@@ -3,6 +3,8 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -52,7 +54,8 @@ export default function DatasetDetailPage() {
   const [hiddenCameras, setHiddenCameras] = useState<Set<string>>(new Set());
 
   const [trailKey, setTrailKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<'episode' | '3d-replay'>('episode');
+  const [activeTab, setActiveTab] = useState<'episode' | '3d-replay' | 'statistics'>('episode');
+  const [histBins, setHistBins] = useState(20);
   const [playbackEnded, setPlaybackEnded] = useState(false);
   const playbackEndedRef = useRef(false);
   const [show3DCard, setShow3DCard] = useState(true);
@@ -243,6 +246,52 @@ export default function DatasetDetailPage() {
       });
   })();
 
+  const recordingTime = (() => {
+    if (!info) return '—';
+    const sec = info.total_frames / info.fps;
+    const hh = Math.floor(sec / 3600);
+    const mm = Math.floor((sec % 3600) / 60);
+    const ss = Math.floor(sec % 60);
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  })();
+
+  const cameraResolutions = info
+    ? Object.entries(info.features)
+        .filter(([k]) => k.startsWith('observation.images.'))
+        .map(([k, v]) => ({
+          name: k.replace('observation.images.', ''),
+          shape: v.shape,
+        }))
+    : [];
+
+  const successRate = episodes.length > 0
+    ? ((info?.total_successes ?? 0) / episodes.length * 100).toFixed(1)
+    : null;
+
+  const epLengthStats = (() => {
+    if (episodes.length === 0) return null;
+    const lengths = episodes.map((e) => e.length);
+    const sorted = [...lengths].sort((a, b) => a - b);
+    const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const stddev = Math.sqrt(lengths.reduce((a, b) => a + (b - mean) ** 2, 0) / lengths.length);
+    return { min: sorted[0], max: sorted[sorted.length - 1], mean, median, stddev };
+  })();
+
+  const histogramData = (() => {
+    if (!epLengthStats || episodes.length === 0) return [];
+    const lengths = episodes.map((e) => e.length);
+    const { min, max } = epLengthStats;
+    if (min === max) return [{ x: min, count: lengths.length }];
+    const binSize = (max - min) / histBins;
+    const counts = Array(histBins).fill(0);
+    lengths.forEach((v) => {
+      const idx = Math.min(Math.floor((v - min) / binSize), histBins - 1);
+      counts[idx]++;
+    });
+    return counts.map((count, i) => ({ x: Math.round(min + i * binSize), count }));
+  })();
+
   const selectedEpisode = episodes.find((ep) => ep.episode_index === selectedIdx);
   const visibleVideos = videoUrls.filter((v) => !hiddenCameras.has(v.camera));
 
@@ -319,26 +368,30 @@ export default function DatasetDetailPage() {
         </aside>
 
         <div className="dd-main-wrapper">
-          {framesData && !loadingEpisode && !episodeError && (
-            <div className="dd-tabs">
-              <button
-                className={`dd-tab ${activeTab === 'episode' ? 'active' : ''}`}
-                onClick={() => setActiveTab('episode')}
-              >
-                Episode
-              </button>
-              <button
-                className={`dd-tab ${activeTab === '3d-replay' ? 'active' : ''}`}
-                onClick={() => setActiveTab('3d-replay')}
-              >
-                3D Replay
-              </button>
-            </div>
-          )}
+          <div className="dd-tabs">
+            <button
+              className={`dd-tab ${activeTab === 'episode' ? 'active' : ''}`}
+              onClick={() => setActiveTab('episode')}
+            >
+              Episode
+            </button>
+            <button
+              className={`dd-tab ${activeTab === '3d-replay' ? 'active' : ''}`}
+              onClick={() => setActiveTab('3d-replay')}
+            >
+              3D Replay
+            </button>
+            <button
+              className={`dd-tab ${activeTab === 'statistics' ? 'active' : ''}`}
+              onClick={() => setActiveTab('statistics')}
+            >
+              Statistics
+            </button>
+          </div>
 
           <div
             className="dd-episode-area"
-            style={activeTab === '3d-replay' && !loadingEpisode && !episodeError && !!framesData ? { display: 'none' } : undefined}
+            style={activeTab === 'statistics' || (activeTab === '3d-replay' && !loadingEpisode && !episodeError && !!framesData) ? { display: 'none' } : undefined}
           >
           <main className="dd-main">
               {loadingEpisode && <p className="dd-state-msg">Loading episode...</p>}
@@ -602,6 +655,108 @@ export default function DatasetDetailPage() {
               </div>
             )}
           </div>
+
+          {activeTab === 'statistics' && (
+            <div className="dd-stats-area">
+              <div className="dd-stats-kpi-grid">
+                <div className="glass-card dd-stats-kpi-card">
+                  <span className="dd-kpi-label label">Total Frames</span>
+                  <span className="dd-kpi-value">{info.total_frames.toLocaleString()}</span>
+                </div>
+                <div className="glass-card dd-stats-kpi-card">
+                  <span className="dd-kpi-label label">Total Episodes</span>
+                  <span className="dd-kpi-value">{info.total_episodes}</span>
+                </div>
+                <div className="glass-card dd-stats-kpi-card">
+                  <span className="dd-kpi-label label">FPS</span>
+                  <span className="dd-kpi-value">{info.fps}</span>
+                </div>
+                <div className="glass-card dd-stats-kpi-card">
+                  <span className="dd-kpi-label label">Recording Time</span>
+                  <span className="dd-kpi-value dd-kpi-value">{recordingTime}</span>
+                </div>
+                {successRate !== null && (
+                  <div className="glass-card dd-stats-kpi-card">
+                    <span className="dd-kpi-label label">Success Rate</span>
+                    <span className="dd-kpi-value">{successRate}<span className="dd-kpi-unit">%</span></span>
+                  </div>
+                )}
+                <div className="glass-card dd-stats-kpi-card">
+                  <span className="dd-kpi-label label">Robot Type</span>
+                  <span className="dd-kpi-value">{info.robot_type}</span>
+                </div>
+              </div>
+
+              {cameraResolutions.length > 0 && (
+                <div className="glass-card dd-stats-section">
+                  <div className="dd-stats-section-header">
+                    <span className="label">Camera Resolutions</span>
+                    <span className="badge badge-gray">{cameraResolutions.length}</span>
+                  </div>
+                  <div className="dd-stats-kpi-grid">
+                    {cameraResolutions.map(({ name, shape }) => (
+                      <div key={name} className="glass-card dd-stats-kpi-card">
+                        <span className="dd-kpi-label label">{name}</span>
+                        <span className="dd-kpi-value">
+                          {shape.length === 3 ? `${shape[1]} × ${shape[0]}` : shape.join(' × ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {epLengthStats && (
+                <div className="glass-card dd-stats-section">
+                  <div className="dd-stats-section-header">
+                    <span className="label">Episode Lengths</span>
+                    <span className="label" style={{ color: 'var(--text-3)' }}>frames</span>
+                  </div>
+                  <div className="dd-stats-ep-stats">
+                    {([
+                      ['Shortest', epLengthStats.min],
+                      ['Longest', epLengthStats.max],
+                      ['Mean', epLengthStats.mean.toFixed(1)],
+                      ['Median', epLengthStats.median],
+                      ['Std Dev', epLengthStats.stddev.toFixed(1)],
+                    ] as [string, string | number][]).map(([label, val]) => (
+                      <div key={label} className="dd-stats-ep-stat">
+                        <span className="label">{label}</span>
+                        <span className="dd-stat-val--mono">{val}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <BarChart data={histogramData} margin={{ top: 4, right: 8, bottom: 4, left: -16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="x" tick={{ fontSize: 10, fill: 'var(--text-3)' }} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                        formatter={(v) => [v, 'Episodes']}
+                        labelFormatter={(l) => `~${l} frames`}
+                      />
+                      <Bar dataKey="count" fill="var(--purple)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="dd-stats-bins-row">
+                    <span className="label">Bins</span>
+                    <input
+                      type="range"
+                      min={5}
+                      max={50}
+                      step={1}
+                      value={histBins}
+                      onChange={(e) => setHistBins(Number(e.target.value))}
+                      className="dd-scrubber"
+                      style={{ maxWidth: 160 }}
+                    />
+                    <span className="dd-frame-counter">{histBins}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {activeTab === '3d-replay' && framesData && !loadingEpisode && !episodeError && (
             <div className="dd-3d-tab-view">
