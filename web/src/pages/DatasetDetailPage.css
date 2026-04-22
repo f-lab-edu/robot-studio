@@ -71,6 +71,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.dd-stat-val--mono {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
 .dd-sidebar-header {
   display: flex;
   align-items: center;
@@ -502,6 +509,122 @@
 .dd-tab.active {
   color: var(--purple);
   border-bottom-color: var(--purple);
+}
+
+/* ── Statistics 탭 ───────────────────────────── */
+.dd-stats-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dd-stats-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.dd-stats-kpi-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dd-kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dd-kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.dd-kpi-value--mono {
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0;
+}
+
+.dd-kpi-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+
+.dd-stats-section {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dd-stats-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dd-stats-cameras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dd-stats-camera-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.dd-stats-camera-name {
+  color: var(--text-2);
+}
+
+.dd-stats-camera-res {
+  font-weight: 600;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.dd-stats-ep-stats {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dd-stats-ep-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 14px;
+  border-right: 1px solid var(--border);
+}
+
+.dd-stats-ep-stat:last-child {
+  border-right: none;
+}
+
+.dd-stats-bins-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* ── 3D Replay 탭 전체 뷰 ────────────────────── */
