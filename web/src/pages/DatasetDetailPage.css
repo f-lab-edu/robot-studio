@@ -422,51 +422,6 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   background: #0d1117;
-  position: relative;
-}
-
-.dd-3d-hint {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-}
-
-.dd-3d-hint-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.80);
-  border: 1px solid rgba(255, 255, 255, 0.50);
-  border-radius: 10px;
-}
-
-.dd-3d-hint-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.dd-3d-hint-key {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-1);
-  min-width: 90px;
-}
-
-.dd-3d-hint-desc {
-  font-size: 11px;
-  color: var(--text-1);
-}
-
-.dd-video-action-btn.active {
-  color: var(--text-1);
-  opacity: 1;
 }
 
 /* ── 탭 바 ───────────────────────────────────── */
