@@ -1,5 +1,4 @@
 import os
-import asyncio
 import asyncpg
 
 # app 모듈 import 전에 환경변수 설정
@@ -17,20 +16,6 @@ _ASYNCPG_ADMIN_URL = (
     _BASE_URL.replace("postgresql+asyncpg://", "postgresql://").rsplit("/", 1)[0]
     + "/postgres"
 )
-
-
-async def _ensure_test_db():
-    """robot_studio_test DB가 없으면 생성"""
-    conn = await asyncpg.connect(_ASYNCPG_ADMIN_URL)
-    exists = await conn.fetchval(
-        "SELECT 1 FROM pg_database WHERE datname=$1", _TEST_DB_NAME
-    )
-    if not exists:
-        await conn.execute(f'CREATE DATABASE "{_TEST_DB_NAME}"')
-    await conn.close()
-
-
-asyncio.run(_ensure_test_db())
 
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
@@ -59,8 +44,20 @@ from app.infra.database import get_db
 from app.core.redis import get_redis
 
 
+@pytest_asyncio.fixture(autouse=True, scope="session")
+async def ensure_test_db():
+    """robot_studio_test DB가 없으면 생성 (세션 당 1회)"""
+    conn = await asyncpg.connect(_ASYNCPG_ADMIN_URL)
+    exists = await conn.fetchval(
+        "SELECT 1 FROM pg_database WHERE datname=$1", _TEST_DB_NAME
+    )
+    if not exists:
+        await conn.execute(f'CREATE DATABASE "{_TEST_DB_NAME}"')
+    await conn.close()
+
+
 @pytest_asyncio.fixture(autouse=True)
-async def setup_db():
+async def setup_db(ensure_test_db):
     """각 테스트 전 테이블 생성, 후 제거"""
     async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
