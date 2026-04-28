@@ -1,306 +1,27 @@
-/* ── 페이지 레이아웃 ─────────────────────────── */
 .ds-list-page {
   min-height: 100vh;
   background: var(--bg);
 }
 
-.ds-layout {
-  display: flex;
-  align-items: flex-start;
-  max-width: 1200px;
+.ds-list-main {
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 32px 24px;
-  gap: 32px;
+  padding: 40px 24px;
 }
 
-/* ── 프로필 사이드바 ──────────────────────────── */
-.profile-sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  position: sticky;
-  top: calc(var(--nav-height) + 24px);
+.ds-list-header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
+  margin-bottom: 28px;
 }
 
-.profile-avatar {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--purple) 0%, #a855f7 100%);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(32px, 10vw, 70px);
-  font-weight: 700;
-  letter-spacing: -0.5px;
-}
-
-.profile-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-1);
-  line-height: 1.2;
-  margin-top: 4px;
-}
-
-.profile-bio {
-  font-size: 14px;
-  color: var(--text-2);
-  line-height: 1.5;
-}
-
-.profile-edit-btn {
-  width: 100%;
-  padding: 7px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  color: var(--text-1);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  text-align: center;
-}
-
-.profile-edit-btn:hover {
-  background: var(--surface-sub);
-  border-color: var(--border-strong);
-}
-
-.profile-stats {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-.profile-stat-icon {
-  font-size: 14px;
-}
-
-.profile-stat-link {
-  color: var(--text-1);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.profile-stat-link:hover {
-  color: var(--purple);
-}
-
-.profile-stat-sep {
-  color: var(--text-3);
-}
-
-.profile-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-.profile-meta-icon {
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.profile-link {
-  color: var(--purple);
-  text-decoration: none;
-}
-
-.profile-link:hover {
-  text-decoration: underline;
-}
-
-/* ── 프로필 편집 폼 ──────────────────────────── */
-.profile-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.profile-form-label {
-  font-size: 12px;
+.ds-list-title {
+  font-size: 22px;
   font-weight: 600;
   color: var(--text-1);
-  margin-top: 6px;
-  display: block;
 }
 
-.profile-form-hint {
-  font-size: 11px;
-  color: var(--text-3);
-  line-height: 1.4;
-}
-
-.profile-mention {
-  color: var(--purple);
-}
-
-.profile-input,
-.profile-textarea,
-.profile-select {
-  width: 100%;
-  padding: 7px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  color: var(--text-1);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.profile-input:focus,
-.profile-textarea:focus,
-.profile-select:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px var(--purple-bg);
-}
-
-.profile-textarea {
-  resize: vertical;
-  min-height: 64px;
-}
-
-.profile-input-icon {
-  flex: 1;
-}
-
-.profile-form-icon-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.profile-icon {
-  font-size: 15px;
-  flex-shrink: 0;
-  width: 18px;
-  text-align: center;
-}
-
-.profile-form-time-row {
-  align-items: flex-start;
-  padding-top: 2px;
-}
-
-.profile-time-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.profile-time-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-1);
-  cursor: pointer;
-}
-
-.profile-form-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.btn-primary {
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  color: #fff;
-  background: var(--purple);
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-primary:hover {
-  background: #6d28d9;
-}
-
-.btn-ghost {
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  color: var(--text-2);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-ghost:hover {
-  background: var(--surface-sub);
-}
-
-/* ── 콘텐츠 영역 ──────────────────────────────── */
-.ds-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.ds-content-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-/* ── 검색창 ──────────────────────────────────── */
-.ds-search-wrap {
-  position: relative;
-  flex: 1;
-}
-
-.ds-search-icon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
-  pointer-events: none;
-}
-
-.ds-search-input {
-  width: 100%;
-  padding: 8px 12px 8px 34px;
-  font-size: 14px;
-  font-family: inherit;
-  color: var(--text-1);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.ds-search-input::placeholder {
-  color: var(--text-3);
-}
-
-.ds-search-input:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px var(--purple-bg);
-}
-
-/* ── 상태 메시지 ─────────────────────────────── */
 .ds-state-msg {
   color: var(--text-3);
   font-size: 14px;
@@ -325,9 +46,13 @@
 }
 
 .ds-table-header {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 14px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: var(--nav-height);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
 }
 
 .ds-table-body {
