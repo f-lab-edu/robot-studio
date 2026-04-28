@@ -67,6 +67,3 @@ export const getEpisodeFrames = (name: string, episodeIndex: number) =>
   apiFetch<EpisodeFramesResponse>(
     `/datasets/${encodeURIComponent(name)}/episodes/${episodeIndex}/frames`
   );
-
-export const getVideoProxyUrl = (name: string, episodeIndex: number, camera: string) =>
-  `/api/v1/datasets/${encodeURIComponent(name)}/episodes/${episodeIndex}/video?camera=${encodeURIComponent(camera)}`;

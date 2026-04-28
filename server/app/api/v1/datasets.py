@@ -1,6 +1,4 @@
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.infra.s3 import get_s3_client
 from app.services.dataset_service import DatasetService
@@ -74,46 +72,6 @@ def get_video_urls(
         return service.get_video_urls(dataset_name, episode_index)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/{dataset_name}/episodes/{episode_index}/video")
-async def proxy_video(
-    dataset_name: str,
-    episode_index: int,
-    camera: str,
-    request: Request,
-    service: DatasetService = Depends(get_dataset_service),
-):
-    urls = service.get_video_urls(dataset_name, episode_index)
-    video = next((u for u in urls if u.camera == camera), None)
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-
-    req_headers = {}
-    if "range" in request.headers:
-        req_headers["Range"] = request.headers["range"]
-
-    client = httpx.AsyncClient()
-    s3_resp = await client.send(
-        httpx.Request("GET", video.url, headers=req_headers),
-        stream=True,
-    )
-
-    res_headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Type": s3_resp.headers.get("Content-Type", "video/mp4"),
-    }
-    if "Content-Length" in s3_resp.headers:
-        res_headers["Content-Length"] = s3_resp.headers["Content-Length"]
-    if "Content-Range" in s3_resp.headers:
-        res_headers["Content-Range"] = s3_resp.headers["Content-Range"]
-
-    return StreamingResponse(
-        s3_resp.aiter_bytes(chunk_size=65536),
-        status_code=s3_resp.status_code,
-        headers=res_headers,
-        media_type="video/mp4",
-    )
 
 
 @router.get("/{dataset_name}/episodes/{episode_index}/frames", response_model=EpisodeFramesResponse)
