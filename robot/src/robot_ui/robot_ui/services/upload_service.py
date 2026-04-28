@@ -18,11 +18,11 @@ class UploadService:
         self,
         file_path: str,
         object_name: str,
-        content_type: str = "application/octet-stream",
+        content_type: str = "video/mp4",
     ) -> bool:
         for attempt in range(self.max_retries):
             try:
-                presigned_url = await self.api_client.get_presigned_url(object_name, content_type)
+                presigned_url = await self.api_client.get_presigned_url(object_name)
                 await self.api_client.upload_to_s3(presigned_url, file_path, content_type)
                 return True
 
