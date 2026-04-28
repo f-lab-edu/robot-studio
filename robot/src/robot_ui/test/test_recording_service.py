@@ -173,18 +173,25 @@ async def test_upload_episodes_stops_on_none():
 # _collect_episodes
 # ──────────────────────────────────────────────
 
+def _make_frame_injector(service, data_length):
+    """data_length 만큼 sleep할 때 프레임을 collected_frames에 주입하는 coroutine 반환"""
+    async def fake_sleep(duration):
+        if duration == data_length:
+            service.collected_frames.append(FAKE_FRAME.copy())
+    return fake_sleep
+
+
 @pytest.mark.asyncio
 async def test_collect_episodes_calls_on_status_per_episode():
     service, _ = make_service()
     on_status = MagicMock()
     queue = asyncio.Queue()
 
-    service.collected_frames = [FAKE_FRAME.copy()]
-
     mock_writer = MagicMock()
-    with patch("asyncio.sleep", new_callable=AsyncMock), \
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
          patch("cv2.VideoWriter", return_value=mock_writer), \
          patch("cv2.VideoWriter_fourcc", return_value=0):
+        mock_sleep.side_effect = _make_frame_injector(service, 1.0)
         settings = {"episodes": 3, "data_length": 1.0, "term_length": 0}
         await service._collect_episodes(settings, queue, on_status)
 
@@ -192,21 +199,43 @@ async def test_collect_episodes_calls_on_status_per_episode():
 
 
 @pytest.mark.asyncio
-async def test_collect_episodes_puts_none_at_end():
+async def test_collect_episodes_puts_video_then_none_in_queue():
+    """프레임이 수집되면 (index, path)가 먼저, 마지막에 None이 들어와야 한다"""
     service, _ = make_service()
     queue = asyncio.Queue()
 
-    service.collected_frames = [FAKE_FRAME.copy()]
-
     mock_writer = MagicMock()
-    with patch("asyncio.sleep", new_callable=AsyncMock), \
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
          patch("cv2.VideoWriter", return_value=mock_writer), \
          patch("cv2.VideoWriter_fourcc", return_value=0):
+        mock_sleep.side_effect = _make_frame_injector(service, 1.0)
+        settings = {"episodes": 1, "data_length": 1.0, "term_length": 0}
+        await service._collect_episodes(settings, queue, None)
+
+    item = await queue.get()
+    assert item is not None
+    episode_index, video_path = item
+    assert episode_index == 0
+    assert isinstance(video_path, str)
+    Path(video_path).unlink(missing_ok=True)
+
+    sentinel = await queue.get()
+    assert sentinel is None
+
+
+@pytest.mark.asyncio
+async def test_collect_episodes_skips_queue_put_when_no_frames():
+    """프레임이 없으면 (index, path)는 queue에 넣지 않고 None만 넣어야 한다"""
+    service, _ = make_service()
+    queue = asyncio.Queue()
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
         settings = {"episodes": 1, "data_length": 1.0, "term_length": 0}
         await service._collect_episodes(settings, queue, None)
 
     sentinel = await queue.get()
     assert sentinel is None
+    assert queue.empty()
 
 
 @pytest.mark.asyncio
@@ -214,12 +243,11 @@ async def test_collect_episodes_calls_sleep_with_data_length():
     service, _ = make_service()
     queue = asyncio.Queue()
 
-    service.collected_frames = [FAKE_FRAME.copy()]
-
     mock_writer = MagicMock()
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
          patch("cv2.VideoWriter", return_value=mock_writer), \
          patch("cv2.VideoWriter_fourcc", return_value=0):
+        mock_sleep.side_effect = _make_frame_injector(service, 5.0)
         settings = {"episodes": 1, "data_length": 5.0, "term_length": 0}
         await service._collect_episodes(settings, queue, None)
 
