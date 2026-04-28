@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
     async def _exchange_and_login(self, code: str):
         try:
             tokens = await self.api_client.exchange_code(code)
-            self.api_client.set_token(tokens["access_token"])
+            self.api_client.set_token(tokens["access_token"], tokens["refresh_token"])
             self.stacked_widget.setCurrentIndex(1)
         except ValueError:
             logger.warning("Code exchange failed: invalid or expired code")
