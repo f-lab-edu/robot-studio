@@ -24,16 +24,17 @@ def make_cm(response):
 # 단위 테스트 (HTTP 없음)
 
 def test_set_token_stores_token():
-    """set_token 호출 후 _token에 값이 저장되는지 검증"""
+    """set_token 호출 후 _token, _refresh_token에 값이 저장되는지 검증"""
     client = ApiClient()
-    client.set_token("my.jwt.token")
+    client.set_token("my.jwt.token", "my.refresh.token")
     assert client._token == "my.jwt.token"
+    assert client._refresh_token == "my.refresh.token"
 
 
 def test_auth_headers_returns_bearer_when_token_set():
     """토큰이 설정된 경우 Authorization 헤더 반환"""
     client = ApiClient()
-    client.set_token("my.jwt.token")
+    client.set_token("my.jwt.token", "my.refresh.token")
     assert client._auth_headers() == {"Authorization": "Bearer my.jwt.token"}
 
 
@@ -85,7 +86,7 @@ async def test_exchange_code_sends_code_as_query_param():
 async def test_get_presigned_url_returns_url():
     """서버 응답에서 url 값을 반환하는지 검증"""
     client = ApiClient()
-    client.set_token("my.jwt.token")
+    client.set_token("my.jwt.token", "my.refresh.token")
     response = make_mock_response(
         status=200,
         json_data={"url": "https://fake-s3.example.com/upload?sig=abc"},
@@ -100,7 +101,7 @@ async def test_get_presigned_url_returns_url():
 async def test_get_presigned_url_sends_auth_header():
     """요청에 Authorization 헤더가 포함되는지 검증"""
     client = ApiClient()
-    client.set_token("my.jwt.token")
+    client.set_token("my.jwt.token", "my.refresh.token")
     response = make_mock_response(
         status=200,
         json_data={"url": "https://fake-s3.example.com/upload?sig=abc"},
@@ -126,3 +127,63 @@ async def test_get_presigned_url_without_token_sends_no_auth_header():
         await client.get_presigned_url("episode_001.mp4")
 
     assert mock_post.call_args[1]["headers"] == {}
+
+
+# _refresh_tokens 테스트
+
+async def test_refresh_tokens_updates_tokens():
+    """refresh 성공 시 _token, _refresh_token이 갱신되는지 검증"""
+    client = ApiClient()
+    client.set_token("old.access", "old.refresh")
+    response = make_mock_response(
+        status=200,
+        json_data={"access_token": "new.access", "refresh_token": "new.refresh"},
+    )
+
+    with patch.object(client.session, "post", return_value=make_cm(response)):
+        await client._refresh_tokens()
+
+    assert client._token == "new.access"
+    assert client._refresh_token == "new.refresh"
+
+
+async def test_refresh_tokens_raises_on_401():
+    """refresh_token 만료(401) 시 ValueError 발생"""
+    client = ApiClient()
+    client.set_token("old.access", "expired.refresh")
+    response = make_mock_response(status=401)
+
+    with patch.object(client.session, "post", return_value=make_cm(response)):
+        with pytest.raises(ValueError):
+            await client._refresh_tokens()
+
+
+async def test_refresh_tokens_raises_without_refresh_token():
+    """refresh_token 미설정 시 ValueError 발생"""
+    client = ApiClient()
+    with pytest.raises(ValueError):
+        await client._refresh_tokens()
+
+
+async def test_get_presigned_url_retries_after_401():
+    """401 응답 시 토큰 갱신 후 재시도하여 URL을 반환하는지 검증"""
+    client = ApiClient()
+    client.set_token("old.access", "old.refresh")
+
+    unauthorized = make_mock_response(status=401)
+    success = make_mock_response(
+        status=200,
+        json_data={"url": "https://fake-s3.example.com/upload?sig=xyz"},
+    )
+    mock_post = MagicMock(side_effect=[make_cm(unauthorized), make_cm(success)])
+    refresh_response = make_mock_response(
+        status=200,
+        json_data={"access_token": "new.access", "refresh_token": "new.refresh"},
+    )
+
+    with patch.object(client.session, "post", mock_post):
+        with patch.object(client, "_refresh_tokens", AsyncMock(side_effect=lambda: setattr(client, "_token", "new.access") or None)):
+            url = await client.get_presigned_url("episode_001.mp4")
+
+    assert url == "https://fake-s3.example.com/upload?sig=xyz"
+    assert mock_post.call_count == 2
