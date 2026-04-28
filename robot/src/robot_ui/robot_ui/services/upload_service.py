@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from rclpy.logging import get_logger
 
 from ..utils.api_client import ApiClient
@@ -14,16 +13,11 @@ class UploadService:
         self.api_client = api_client
         self.max_retries = max_retries
 
-    async def upload_with_retry(
-        self,
-        file_path: str,
-        object_name: str,
-        content_type: str = "video/mp4",
-    ) -> bool:
+    async def upload_with_retry(self, video_path: str, object_name: str) -> bool:
         for attempt in range(self.max_retries):
             try:
                 presigned_url = await self.api_client.get_presigned_url(object_name)
-                await self.api_client.upload_to_s3(presigned_url, file_path, content_type)
+                await self._upload_video(video_path, presigned_url)
                 return True
 
             except Exception as e:
@@ -39,33 +33,7 @@ class UploadService:
         logger.error(f"Upload failed after {self.max_retries} attempts: '{object_name}'")
         return False
 
-    async def upload_episode(
-        self,
-        session_dir: Path,
-        dataset_name: str,
-        episode_index: int,
-        chunk_index: int,
-        camera_roles: list[str],
-    ) -> bool:
-        """비디오(role별) + parquet 파일을 병렬 업로드"""
-        chunk = f"chunk-{chunk_index:03d}"
-        ep    = f"episode_{episode_index:06d}"
-
-        tasks = []
-        for role in camera_roles:
-            local  = session_dir / "videos" / chunk / f"observation.images.{role}" / f"{ep}.mp4"
-            s3_key = f"{dataset_name}/videos/{chunk}/observation.images.{role}/{ep}.mp4"
-            tasks.append(self.upload_with_retry(str(local), s3_key, "video/mp4"))
-
-        parquet_local = session_dir / "data" / chunk / f"{ep}.parquet"
-        parquet_s3    = f"{dataset_name}/data/{chunk}/{ep}.parquet"
-        tasks.append(self.upload_with_retry(str(parquet_local), parquet_s3, "application/octet-stream"))
-
-        results = await asyncio.gather(*tasks)
-        return all(results)
-
-    async def upload_meta(self, session_dir: Path, dataset_name: str):
-        """meta/ 디렉토리 전체 업로드"""
-        for meta_file in (session_dir / "meta").iterdir():
-            s3_key = f"{dataset_name}/meta/{meta_file.name}"
-            await self.upload_with_retry(str(meta_file), s3_key, "application/json")
+    async def _upload_video(self, video_path: str, presigned_url: str):
+        """Presigned URL로 비디오 파일 업로드"""
+        await self.api_client.upload_to_s3(presigned_url, video_path)
+        logger.info(f"Upload successful: {presigned_url[:50]}...")
