@@ -337,11 +337,10 @@ export default function DatasetDetailPage() {
             </div>
           )}
 
-          <div
-            className="dd-episode-area"
+          <main
+            className="dd-main"
             style={activeTab === '3d-replay' && !loadingEpisode && !episodeError && !!framesData ? { display: 'none' } : undefined}
           >
-          <main className="dd-main">
               {loadingEpisode && <p className="dd-state-msg">Loading episode...</p>}
               {episodeError && (
                 <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
@@ -569,42 +568,6 @@ export default function DatasetDetailPage() {
               )}
             </main>
 
-            {framesData && !loadingEpisode && (
-              <div className="dd-playbar-wrap">
-                <div className="dd-playbar">
-                  <button className="dd-playbar-btn" onClick={() => stepFrame(-1)} title="이전 프레임">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
-                    </svg>
-                  </button>
-                  <button className="dd-playbar-btn dd-play-btn" onClick={togglePlayPause} title={isPlaying ? "일시정지" : "재생"}>
-                    {isPlaying
-                      ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                      : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                    }
-                  </button>
-                  <button className="dd-playbar-btn" onClick={() => stepFrame(1)} title="다음 프레임">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1L8.5 12zM16 6h2v12h-2z"/>
-                    </svg>
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.001}
-                    value={duration > 0 ? currentTime / duration : 0}
-                    onChange={(e) => handleSeek(Number(e.target.value))}
-                    className="dd-scrubber"
-                  />
-                  <span className="dd-frame-counter">
-                    {currentFrame?.frame_index ?? 0} / {framesData.frames.length - 1}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
           {activeTab === '3d-replay' && framesData && !loadingEpisode && !episodeError && (
             <div className="dd-3d-tab-view">
               <RobotViewer
@@ -622,38 +585,30 @@ export default function DatasetDetailPage() {
             </div>
           )}
 
-          {activeTab === '3d-replay' && framesData && !loadingEpisode && (
-            <div className="dd-playbar-wrap">
-              <div className="dd-playbar">
-                <button className="dd-playbar-btn" onClick={() => stepFrame(-1)} title="이전 프레임">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
-                  </svg>
-                </button>
-                <button className="dd-playbar-btn dd-play-btn" onClick={togglePlayPause} title={isPlaying ? "일시정지" : "재생"}>
-                  {isPlaying
-                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                  }
-                </button>
-                <button className="dd-playbar-btn" onClick={() => stepFrame(1)} title="다음 프레임">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1L8.5 12zM16 6h2v12h-2z"/>
-                  </svg>
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.001}
-                  value={duration > 0 ? currentTime / duration : 0}
-                  onChange={(e) => handleSeek(Number(e.target.value))}
-                  className="dd-scrubber"
-                />
-                <span className="dd-frame-counter">
-                  {currentFrame?.frame_index ?? 0} / {framesData.frames.length - 1}
-                </span>
-              </div>
+          {framesData && !loadingEpisode && (
+            <div className="dd-playbar">
+              <button className="dd-playbar-btn" onClick={() => stepFrame(-1)} title="이전 프레임">
+                ⏮
+              </button>
+              <button className="dd-playbar-btn dd-play-btn" onClick={togglePlayPause}>
+                {isPlaying ? "⏸" : "▶"}
+              </button>
+              <button className="dd-playbar-btn" onClick={() => stepFrame(1)} title="다음 프레임">
+                ⏭
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.001}
+                value={duration > 0 ? currentTime / duration : 0}
+                onChange={(e) => handleSeek(Number(e.target.value))}
+                className="dd-scrubber"
+              />
+              <span className="dd-frame-counter">
+                {currentFrame?.frame_index ?? 0} / {framesData.frames.length - 1}
+              </span>
+              <span className="dd-key-hint">Space: play/pause · ↑↓: episode</span>
             </div>
           )}
         </div>
