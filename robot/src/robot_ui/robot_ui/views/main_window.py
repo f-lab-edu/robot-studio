@@ -64,15 +64,6 @@ class MainWindow(QMainWindow):
         self.empty_area.setStyleSheet("background-color: #1e1e1e;")
         main_layout.addWidget(self.empty_area, 1)
 
-        # 카메라 토픽 목록 → DatasetSettingPanel 콤보박스 연결
-        self.camera_preview_area.topics_updated.connect(
-            self.dataset_setting_panel.set_available_topics
-        )
-        # 초기화 시 이미 발견된 토픽 즉시 반영
-        self.dataset_setting_panel.set_available_topics(
-            list(self.camera_preview_area.preview_widgets.keys())
-        )
-
     def _on_menu_selected(self, menu_id: str):
         # 모든 영역 숨기기
         self.teleop_panel.setVisible(False)
@@ -92,6 +83,8 @@ class MainWindow(QMainWindow):
 
     def _on_camera_selected(self, topic_name: str):
         """카메라 선택 시 Dataset Setting 화면으로 전환"""
+        self.dataset_setting_panel.set_camera(topic_name)
+
         # 모든 영역 숨기고 Dataset Setting 표시
         self.camera_preview_area.setVisible(False)
         self.dataset_setting_panel.setVisible(True)
