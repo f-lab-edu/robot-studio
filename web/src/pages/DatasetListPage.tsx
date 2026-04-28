@@ -12,17 +12,9 @@ export default function DatasetListPage() {
   useEffect(() => {
     listDatasets()
       .then((summaries) =>
-        Promise.allSettled(summaries.map((s) => getDatasetInfo(s.name)))
+        Promise.all(summaries.map((s) => getDatasetInfo(s.name)))
       )
-      .then((results) => {
-        const loaded = results
-          .filter((r): r is PromiseFulfilledResult<DatasetInfo> => r.status === "fulfilled")
-          .map((r) => r.value);
-        setDatasets(loaded);
-        if (loaded.length === 0 && results.length > 0) {
-          setError("데이터셋 정보를 불러올 수 없습니다.");
-        }
-      })
+      .then(setDatasets)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
