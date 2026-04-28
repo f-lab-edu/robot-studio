@@ -26,11 +26,6 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# ffmpeg 설치 (OpenCV에서 필요)
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
 # 한글 폰트 설치
 RUN apt-get update && apt-get install -y \
     fonts-nanum \
