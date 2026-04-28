@@ -47,7 +47,6 @@ export default function EpisodeDetailPage() {
         setInfo(i);
         setVideoUrls(urls);
         setFramesData(frames);
-        if (frames.frames.length > 0) setCurrentFrame(frames.frames[0]);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -139,8 +138,7 @@ export default function EpisodeDetailPage() {
               src={v.url}
               preload="auto"
               width={480}
-              style={{ display: "block", minHeight: 270, background: "#000" }}
-              controls={i === 0}
+              controls
             />
           </div>
         ))}
