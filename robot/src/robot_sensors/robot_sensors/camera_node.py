@@ -19,7 +19,7 @@ class CameraNode(Node):
         self.publisher = self.create_publisher(Image, topic_name, 10)
         self.bridge = CvBridge()
 
-        self.timer = self.create_timer(0.033, self.timer_callback) # 30 FPS
+        self.timer = self.create_timer(0.04, self.timer_callback) # 25 FPS
 
     def _open_camera(self):
         if self.cap is not None:
