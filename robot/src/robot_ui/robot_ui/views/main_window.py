@@ -64,19 +64,14 @@ class MainWindow(QMainWindow):
         self.empty_area.setStyleSheet("background-color: #1e1e1e;")
         main_layout.addWidget(self.empty_area, 1)
 
-        # 카메라 토픽 목록 → DatasetSettingPanel 콤보박스 + DataCollectionPanel 그리드 연결
-        self.camera_preview_area.topics_updated.connect(self._on_topics_updated)
+        # 카메라 토픽 목록 → DatasetSettingPanel 콤보박스 연결
+        self.camera_preview_area.topics_updated.connect(
+            self.dataset_setting_panel.set_available_topics
+        )
         # 초기화 시 이미 발견된 토픽 즉시 반영
         self.dataset_setting_panel.set_available_topics(
             list(self.camera_preview_area.preview_widgets.keys())
         )
-
-    def _on_topics_updated(self, topics: list):
-        self.dataset_setting_panel.set_available_topics(topics)
-        if self.data_collection_panel.isVisible():
-            self.data_collection_panel.update_camera_roles(
-                self.dataset_setting_panel.get_settings()['camera_roles']
-            )
 
     def _on_menu_selected(self, menu_id: str):
         # 모든 영역 숨기기
