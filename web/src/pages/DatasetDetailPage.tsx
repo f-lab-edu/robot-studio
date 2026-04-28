@@ -51,6 +51,7 @@ export default function DatasetDetailPage() {
   const [duration, setDuration] = useState(0);
   const [hiddenCameras, setHiddenCameras] = useState<Set<string>>(new Set());
 
+  const [activeTab, setActiveTab] = useState<"episodes" | "3d-replay">("episodes");
   const [trailKey, setTrailKey] = useState(0);
   const playIntervalRef = useRef<number | null>(null);
   const isPlayingRef = useRef(isPlaying);
@@ -77,6 +78,7 @@ export default function DatasetDetailPage() {
     setDuration(0);
     setHiddenCameras(new Set());
     setTrailKey((k) => k + 1);
+    setActiveTab("episodes");
     if (playIntervalRef.current !== null) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
@@ -144,15 +146,57 @@ export default function DatasetDetailPage() {
 
   const selectEpisode = (idx: number) => setSearchParams({ episode: String(idx) });
 
+  const toggle3DPlayback = useCallback(() => {
+    if (!framesData) return;
+    if (playIntervalRef.current !== null) {
+      clearInterval(playIntervalRef.current);
+      playIntervalRef.current = null;
+      setIsPlaying(false);
+      return;
+    }
+    const startIdx = currentFrame?.frame_index ?? 0;
+    let idx = startIdx;
+    setIsPlaying(true);
+    playIntervalRef.current = window.setInterval(() => {
+      idx += 1;
+      if (idx >= framesData.frames.length) {
+        clearInterval(playIntervalRef.current!);
+        playIntervalRef.current = null;
+        setIsPlaying(false);
+        return;
+      }
+      setCurrentFrame(framesData.frames[idx]);
+    }, 1000 / framesData.fps);
+  }, [framesData, currentFrame]);
+
   const togglePlayPause = useCallback(() => {
+    if (activeTab === "3d-replay") {
+      toggle3DPlayback();
+      return;
+    }
     const vid = firstCameraKey ? videoRefs.current.get(firstCameraKey) : null;
     if (!vid) return;
     if (vid.paused) vid.play();
     else vid.pause();
-  }, [firstCameraKey]);
+  }, [activeTab, firstCameraKey, toggle3DPlayback]);
 
   const handleSeek = useCallback(
     (ratio: number) => {
+      if (activeTab === "3d-replay") {
+        if (playIntervalRef.current !== null) {
+          clearInterval(playIntervalRef.current);
+          playIntervalRef.current = null;
+          setIsPlaying(false);
+        }
+        if (!framesData) return;
+        const frameIdx = Math.min(
+          Math.floor(ratio * framesData.frames.length),
+          framesData.frames.length - 1
+        );
+        setCurrentFrame(framesData.frames[frameIdx]);
+        setCurrentTime(framesData.frames[frameIdx].timestamp);
+        return;
+      }
       const time = ratio * duration;
       videoRefs.current.forEach((vid) => { vid.currentTime = time; });
       setCurrentTime(time);
@@ -164,19 +208,31 @@ export default function DatasetDetailPage() {
         if (frameIdx >= 0) setCurrentFrame(framesData.frames[frameIdx]);
       }
     },
-    [duration, framesData]
+    [activeTab, duration, framesData]
   );
 
   const stepFrame = useCallback(
     (delta: number) => {
-      if (!framesData || duration === 0) return;
+      if (!framesData) return;
+      if (activeTab === "3d-replay") {
+        if (playIntervalRef.current !== null) {
+          clearInterval(playIntervalRef.current);
+          playIntervalRef.current = null;
+          setIsPlaying(false);
+        }
+        const curIdx = currentFrame?.frame_index ?? 0;
+        const newIdx = Math.max(0, Math.min(framesData.frames.length - 1, curIdx + delta));
+        setCurrentFrame(framesData.frames[newIdx]);
+        return;
+      }
+      if (duration === 0) return;
       const newTime = Math.max(
         0,
         Math.min(duration, currentTime + (delta / framesData.fps))
       );
       handleSeek(newTime / duration);
     },
-    [framesData, duration, currentTime, handleSeek]
+    [activeTab, framesData, duration, currentTime, currentFrame, handleSeek]
   );
 
   useEffect(() => {
@@ -256,6 +312,21 @@ export default function DatasetDetailPage() {
         <span className="badge badge-purple" style={{ marginLeft: 8 }}>{info.robot_type}</span>
       </nav>
 
+      <div className="dd-tab-bar">
+        <button
+          className={`dd-tab ${activeTab === "episodes" ? "active" : ""}`}
+          onClick={() => setActiveTab("episodes")}
+        >
+          Episodes
+        </button>
+        <button
+          className={`dd-tab ${activeTab === "3d-replay" ? "active" : ""}`}
+          onClick={() => setActiveTab("3d-replay")}
+        >
+          3D Replay
+        </button>
+      </div>
+
       <div className="dd-layout">
         <aside className="dd-sidebar">
           <div className="dd-sidebar-stats">
@@ -307,6 +378,8 @@ export default function DatasetDetailPage() {
               <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
             )}
 
+            {/* Episodes 콘텐츠: 탭 전환 시 video가 언마운트되지 않도록 display로만 숨김 */}
+            <div style={{ display: activeTab === "episodes" ? "contents" : "none" }}>
             {!loadingEpisode && !episodeError && (
               <>
                 <div className="dd-ep-header">
@@ -320,75 +393,56 @@ export default function DatasetDetailPage() {
                   )}
                 </div>
 
-                <div>
-                  {hiddenCameras.size > 0 && (
-                    <button
-                      className="dd-restore-cameras"
-                      onClick={() => setHiddenCameras(new Set())}
-                    >
-                      + 숨겨진 카메라 {hiddenCameras.size}개 표시
-                    </button>
-                  )}
-                  <div className="dd-video-grid">
-                    {framesData && (
-                      <div className="dd-video-card glass-card">
-                        <div className="dd-video-card-header">
-                          <span className="dd-camera-label label">3D Replay</span>
-                        </div>
-                        <div className="dd-3d-video-canvas">
-                          <RobotViewer
-                            jointPositions={
-                              currentFrame
-                                ? Object.fromEntries(
-                                    jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
-                                  )
-                                : {}
-                            }
-                            showTrail={true}
-                            isPlaying={isPlaying}
-                            trailKey={trailKey}
+                {videoUrls.length > 0 && (
+                  <div>
+                    {hiddenCameras.size > 0 && (
+                      <button
+                        className="dd-restore-cameras"
+                        onClick={() => setHiddenCameras(new Set())}
+                      >
+                        + 숨겨진 카메라 {hiddenCameras.size}개 표시
+                      </button>
+                    )}
+                    <div className="dd-video-grid">
+                      {visibleVideos.map((v) => (
+                        <div key={v.camera} className="dd-video-card glass-card">
+                          <div className="dd-video-card-header">
+                            <span className="dd-camera-label label">
+                              {v.camera.replace("observation.images.", "")}
+                            </span>
+                            <div className="dd-video-card-actions">
+                              <button
+                                className="dd-video-action-btn"
+                                onClick={() => handleFullscreen(v.camera)}
+                                title="전체화면"
+                              >
+                                ⛶
+                              </button>
+                              <button
+                                className="dd-video-action-btn"
+                                onClick={() =>
+                                  setHiddenCameras((prev) => new Set([...prev, v.camera]))
+                                }
+                                title="닫기"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <video
+                            ref={(el) => {
+                              if (el) videoRefs.current.set(v.camera, el);
+                              else videoRefs.current.delete(v.camera);
+                            }}
+                            src={getVideoProxyUrl(name ?? "", selectedIdx, v.camera)}
+                            preload="auto"
+                            className="dd-video"
                           />
                         </div>
-                      </div>
-                    )}
-                    {visibleVideos.map((v) => (
-                      <div key={v.camera} className="dd-video-card glass-card">
-                        <div className="dd-video-card-header">
-                          <span className="dd-camera-label label">
-                            {v.camera.replace("observation.images.", "")}
-                          </span>
-                          <div className="dd-video-card-actions">
-                            <button
-                              className="dd-video-action-btn"
-                              onClick={() => handleFullscreen(v.camera)}
-                              title="전체화면"
-                            >
-                              ⛶
-                            </button>
-                            <button
-                              className="dd-video-action-btn"
-                              onClick={() =>
-                                setHiddenCameras((prev) => new Set([...prev, v.camera]))
-                              }
-                              title="닫기"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                        <video
-                          ref={(el) => {
-                            if (el) videoRefs.current.set(v.camera, el);
-                            else videoRefs.current.delete(v.camera);
-                          }}
-                          src={getVideoProxyUrl(name ?? "", selectedIdx, v.camera)}
-                          preload="auto"
-                          className="dd-video"
-                        />
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {selectedEpisode?.language_instruction && (
                   <div className="dd-lang-instruction glass-card">
@@ -511,6 +565,29 @@ export default function DatasetDetailPage() {
                 )}
               </>
             )}
+            </div>
+
+            {/* 3D Replay: CSS로만 숨겨서 WebGL context가 탭 전환 시 재생성되지 않도록 함 */}
+            <div style={{ display: activeTab === "3d-replay" ? "contents" : "none" }}>
+              {framesData && (
+                <div className="dd-3d-wrapper">
+                  <div className="dd-3d-canvas">
+                    <RobotViewer
+                      jointPositions={
+                        currentFrame
+                          ? Object.fromEntries(
+                              jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
+                            )
+                          : {}
+                      }
+                      showTrail={true}
+                      isPlaying={isPlaying}
+                      trailKey={trailKey}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </main>
 
           {framesData && !loadingEpisode && (
@@ -529,7 +606,13 @@ export default function DatasetDetailPage() {
                 min={0}
                 max={1}
                 step={0.001}
-                value={duration > 0 ? currentTime / duration : 0}
+                value={
+                  activeTab === "3d-replay" && framesData
+                    ? (currentFrame?.frame_index ?? 0) / (framesData.frames.length - 1)
+                    : duration > 0
+                    ? currentTime / duration
+                    : 0
+                }
                 onChange={(e) => handleSeek(Number(e.target.value))}
                 className="dd-scrubber"
               />
