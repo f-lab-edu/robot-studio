@@ -1,23 +1,8 @@
-from datetime import datetime
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QDoubleSpinBox,
-    QFrame, QPushButton, QLineEdit, QComboBox
+    QFrame, QPushButton
 )
 from PySide6.QtCore import Qt, Signal
-
-CAMERA_ROLES = ['top', 'wrist']
-
-LABEL_STYLE    = "color: #cccccc; font-size: 14px;"
-INPUT_STYLE    = """
-    background-color: #3c3c3c;
-    color: #ffffff;
-    border: 1px solid #5c5c5c;
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 14px;
-"""
-FOCUSED_BORDER = "border-color: #0e639c;"
 
 
 class DatasetSettingPanel(QWidget):
@@ -27,7 +12,7 @@ class DatasetSettingPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._camera_combos: dict[str, QComboBox] = {}
+        self.selected_topic: str = ""
         self._setup_ui()
 
     def _setup_ui(self):
@@ -37,8 +22,24 @@ class DatasetSettingPanel(QWidget):
 
         # 헤더
         title = QLabel('Dataset Setting')
-        title.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: 600;")
+        title.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 18px;
+                font-weight: 600;
+            }
+        """)
         layout.addWidget(title)
+
+        # 선택된 카메라 표시
+        self.camera_label = QLabel('No camera selected')
+        self.camera_label.setStyleSheet("""
+            QLabel {
+                color: #858585;
+                font-size: 14px;
+            }
+        """)
+        layout.addWidget(self.camera_label)
 
         # 구분선
         separator = QFrame()
@@ -46,36 +47,21 @@ class DatasetSettingPanel(QWidget):
         separator.setStyleSheet("background-color: #3c3c3c;")
         layout.addWidget(separator)
 
+        # 설정 영역
         settings_layout = QVBoxLayout()
         settings_layout.setSpacing(12)
 
-        # Dataset Name
-        self.dataset_name_edit = self._create_lineedit_row(
-            settings_layout, 'Dataset Name',
-            datetime.now().strftime("dataset_%Y%m%d"),
-        )
-
-        # Camera role → topic 매핑
-        for role in CAMERA_ROLES:
-            combo = self._create_combo_row(settings_layout, f'Camera: {role}')
-            self._camera_combos[role] = combo
-
-        # Language Instruction
-        self.language_edit = self._create_lineedit_row(
-            settings_layout, 'Language Instruction', ''
-        )
-
-        # Episodes
+        # 에피소드 개수
         self.episode_spin = self._create_spin_row(
             settings_layout, 'Episodes', 1, 1000, 10
         )
 
-        # Data Length (초)
+        # Data 길이 (초)
         self.data_length_spin = self._create_double_spin_row(
             settings_layout, 'Data Length (sec)', 0.1, 3600.0, 10.0
         )
 
-        # Term Length (초)
+        # Term 길이 (초)
         self.term_length_spin = self._create_double_spin_row(
             settings_layout, 'Term Length (sec)', 0.0, 3600.0, 1.0
         )
@@ -97,69 +83,49 @@ class DatasetSettingPanel(QWidget):
                 font-size: 14px;
                 font-weight: 600;
             }
-            QPushButton:hover { background-color: #1177bb; }
-            QPushButton:pressed { background-color: #094771; }
+            QPushButton:hover {
+                background-color: #1177bb;
+            }
+            QPushButton:pressed {
+                background-color: #094771;
+            }
         """)
         self.submit_btn.clicked.connect(self._on_submit)
         btn_layout.addWidget(self.submit_btn)
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
-    # ------------------------------------------------------------------
-    # 위젯 팩토리
-    # ------------------------------------------------------------------
-
-    def _create_lineedit_row(
-        self, parent_layout: QVBoxLayout, label: str, default: str
-    ) -> QLineEdit:
-        row = QHBoxLayout()
-        lbl = QLabel(label)
-        lbl.setStyleSheet(LABEL_STYLE)
-        lbl.setFixedWidth(160)
-        row.addWidget(lbl)
-
-        edit = QLineEdit(default)
-        edit.setStyleSheet(f"QLineEdit {{ {INPUT_STYLE} }} QLineEdit:focus {{ {FOCUSED_BORDER} }}")
-        edit.setFixedWidth(200)
-        row.addWidget(edit)
-        row.addStretch()
-        parent_layout.addLayout(row)
-        return edit
-
-    def _create_combo_row(
-        self, parent_layout: QVBoxLayout, label: str
-    ) -> QComboBox:
-        row = QHBoxLayout()
-        lbl = QLabel(label)
-        lbl.setStyleSheet(LABEL_STYLE)
-        lbl.setFixedWidth(160)
-        row.addWidget(lbl)
-
-        combo = QComboBox()
-        combo.addItem('')  # 선택 안 함
-        combo.setStyleSheet(f"QComboBox {{ {INPUT_STYLE} }} QComboBox:focus {{ {FOCUSED_BORDER} }}")
-        combo.setFixedWidth(200)
-        row.addWidget(combo)
-        row.addStretch()
-        parent_layout.addLayout(row)
-        return combo
-
     def _create_spin_row(
         self, parent_layout: QVBoxLayout, label: str,
         min_val: int, max_val: int, default: int
     ) -> QSpinBox:
+        """정수 입력 행 생성"""
         row = QHBoxLayout()
+
         lbl = QLabel(label)
-        lbl.setStyleSheet(LABEL_STYLE)
-        lbl.setFixedWidth(160)
+        lbl.setStyleSheet("color: #cccccc; font-size: 14px;")
+        lbl.setFixedWidth(150)
         row.addWidget(lbl)
 
         spin = QSpinBox()
         spin.setRange(min_val, max_val)
         spin.setValue(default)
-        spin.setStyleSheet(f"QSpinBox {{ {INPUT_STYLE} }} QSpinBox:focus {{ {FOCUSED_BORDER} }}")
+        spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #3c3c3c;
+                color: #ffffff;
+                border: 1px solid #5c5c5c;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            QSpinBox:focus {
+                border-color: #0e639c;
+            }
+        """)
         spin.setFixedWidth(120)
         row.addWidget(spin)
+
         row.addStretch()
         parent_layout.addLayout(row)
         return spin
@@ -168,10 +134,12 @@ class DatasetSettingPanel(QWidget):
         self, parent_layout: QVBoxLayout, label: str,
         min_val: float, max_val: float, default: float
     ) -> QDoubleSpinBox:
+        """실수 입력 행 생성"""
         row = QHBoxLayout()
+
         lbl = QLabel(label)
-        lbl.setStyleSheet(LABEL_STYLE)
-        lbl.setFixedWidth(160)
+        lbl.setStyleSheet("color: #cccccc; font-size: 14px;")
+        lbl.setFixedWidth(150)
         row.addWidget(lbl)
 
         spin = QDoubleSpinBox()
@@ -179,44 +147,41 @@ class DatasetSettingPanel(QWidget):
         spin.setValue(default)
         spin.setDecimals(1)
         spin.setSingleStep(0.5)
-        spin.setStyleSheet(f"QDoubleSpinBox {{ {INPUT_STYLE} }} QDoubleSpinBox:focus {{ {FOCUSED_BORDER} }}")
+        spin.setStyleSheet("""
+            QDoubleSpinBox {
+                background-color: #3c3c3c;
+                color: #ffffff;
+                border: 1px solid #5c5c5c;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            QDoubleSpinBox:focus {
+                border-color: #0e639c;
+            }
+        """)
         spin.setFixedWidth(120)
         row.addWidget(spin)
+
         row.addStretch()
         parent_layout.addLayout(row)
         return spin
 
-    # ------------------------------------------------------------------
-    # 공개 API
-    # ------------------------------------------------------------------
+    def set_camera(self, topic_name: str):
+        """선택된 카메라 설정"""
+        self.selected_topic = topic_name
+        self.camera_label.setText(f'Selected: {topic_name}')
 
-    def set_available_topics(self, topics: list[str]):
-        """CameraPreviewArea refresh 결과로 ComboBox 목록 갱신"""
-        for combo in self._camera_combos.values():
-            current = combo.currentText()
-            combo.clear()
-            combo.addItem('')  # 선택 안 함
-            for t in topics:
-                combo.addItem(t)
-            idx = combo.findText(current)
-            combo.setCurrentIndex(idx if idx >= 0 else 0)
+    def _on_submit(self):
+        """Submit 버튼 클릭 시"""
+        settings = self.get_settings()
+        settings['topic'] = self.selected_topic
+        self.submitted.emit(settings)
 
     def get_settings(self) -> dict:
         """현재 설정값 반환"""
-        camera_roles = {}
-        for role, combo in self._camera_combos.items():
-            topic = combo.currentText()
-            if topic:
-                camera_roles[role] = topic
-
         return {
-            'dataset_name':        self.dataset_name_edit.text().strip(),
-            'camera_roles':        camera_roles,
-            'language_instruction': self.language_edit.text().strip(),
-            'episodes':            self.episode_spin.value(),
-            'data_length':         self.data_length_spin.value(),
-            'term_length':         self.term_length_spin.value(),
+            'episodes': self.episode_spin.value(),
+            'data_length': self.data_length_spin.value(),
+            'term_length': self.term_length_spin.value(),
         }
-
-    def _on_submit(self):
-        self.submitted.emit(self.get_settings())
