@@ -52,10 +52,6 @@ export default function DatasetDetailPage() {
   const [hiddenCameras, setHiddenCameras] = useState<Set<string>>(new Set());
 
   const [trailKey, setTrailKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<'episode' | '3d-replay'>('episode');
-  const [playbackEnded, setPlaybackEnded] = useState(false);
-  const playbackEndedRef = useRef(false);
-  const [show3DCard, setShow3DCard] = useState(true);
   const playIntervalRef = useRef<number | null>(null);
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
@@ -81,9 +77,6 @@ export default function DatasetDetailPage() {
     setDuration(0);
     setHiddenCameras(new Set());
     setTrailKey((k) => k + 1);
-    setPlaybackEnded(false);
-    playbackEndedRef.current = false;
-    setShow3DCard(true);
     if (playIntervalRef.current !== null) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
@@ -121,22 +114,12 @@ export default function DatasetDetailPage() {
       if (frameIdx >= 0) setCurrentFrame(framesData.frames[frameIdx]);
     };
     const onPlay = () => {
-      if (playbackEndedRef.current) {
-        setTrailKey((k) => k + 1);
-        playbackEndedRef.current = false;
-      }
-      setPlaybackEnded(false);
       setIsPlaying(true);
       videoRefs.current.forEach((vid, cam) => { if (cam !== firstCameraKey) vid.play(); });
     };
     const onPause = () => {
       setIsPlaying(false);
       videoRefs.current.forEach((vid, cam) => { if (cam !== firstCameraKey) vid.pause(); });
-    };
-    const onEnded = () => {
-      setIsPlaying(false);
-      setPlaybackEnded(true);
-      playbackEndedRef.current = true;
     };
     const onSeeked = () => {
       videoRefs.current.forEach((vid, cam) => {
@@ -148,7 +131,6 @@ export default function DatasetDetailPage() {
     masterVid.addEventListener("timeupdate", onTimeUpdate);
     masterVid.addEventListener("play", onPlay);
     masterVid.addEventListener("pause", onPause);
-    masterVid.addEventListener("ended", onEnded);
     masterVid.addEventListener("seeked", onSeeked);
 
     return () => {
@@ -156,7 +138,6 @@ export default function DatasetDetailPage() {
       masterVid.removeEventListener("timeupdate", onTimeUpdate);
       masterVid.removeEventListener("play", onPlay);
       masterVid.removeEventListener("pause", onPause);
-      masterVid.removeEventListener("ended", onEnded);
       masterVid.removeEventListener("seeked", onSeeked);
     };
   }, [framesData, firstCameraKey]);
@@ -320,270 +301,217 @@ export default function DatasetDetailPage() {
         </aside>
 
         <div className="dd-main-wrapper">
-          {framesData && !loadingEpisode && !episodeError && (
-            <div className="dd-tabs">
-              <button
-                className={`dd-tab ${activeTab === 'episode' ? 'active' : ''}`}
-                onClick={() => setActiveTab('episode')}
-              >
-                Episode
-              </button>
-              <button
-                className={`dd-tab ${activeTab === '3d-replay' ? 'active' : ''}`}
-                onClick={() => setActiveTab('3d-replay')}
-              >
-                3D Replay
-              </button>
-            </div>
-          )}
+          <main className="dd-main">
+            {loadingEpisode && <p className="dd-state-msg">Loading episode...</p>}
+            {episodeError && (
+              <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
+            )}
 
-          <main
-            className="dd-main"
-            style={activeTab === '3d-replay' && !loadingEpisode && !episodeError && !!framesData ? { display: 'none' } : undefined}
-          >
-              {loadingEpisode && <p className="dd-state-msg">Loading episode...</p>}
-              {episodeError && (
-                <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
-              )}
+            {!loadingEpisode && !episodeError && (
+              <>
+                <div className="dd-ep-header">
+                  <span className="dd-nav-name">{info.name}</span>
+                  <span className="dd-nav-sep">·</span>
+                  <span className="dd-ep-title">episode {selectedIdx}</span>
+                  {selectedEpisode && (
+                    <span className={`dd-ep-badge ${selectedEpisode.success ? "success" : "fail"}`}>
+                      {selectedEpisode.success ? "Success" : "Fail"}
+                    </span>
+                  )}
+                </div>
 
-              {!loadingEpisode && !episodeError && (
-                <>
-                  <div className="dd-ep-header">
-                    <span className="dd-nav-name">{info.name}</span>
-                    <span className="dd-nav-sep">·</span>
-                    <span className="dd-ep-title">episode {selectedIdx}</span>
-                    {selectedEpisode && (
-                      <span className={`dd-ep-badge ${selectedEpisode.success ? "success" : "fail"}`}>
-                        {selectedEpisode.success ? "Success" : "Fail"}
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    {(hiddenCameras.size > 0 || !show3DCard) && (
-                      <button
-                        className="dd-restore-cameras"
-                        onClick={() => { setHiddenCameras(new Set()); setShow3DCard(true); }}
-                      >
-                        + 숨겨진 항목 {hiddenCameras.size + (!show3DCard ? 1 : 0)}개 표시
-                      </button>
-                    )}
-                    <div className="dd-video-grid">
-                      {framesData && show3DCard && (
-                        <div className="dd-video-card glass-card">
-                          <div className="dd-video-card-header">
-                            <span className="dd-camera-label label">3D Replay</span>
-                            <div className="dd-video-card-actions">
-                              <button
-                                className="dd-video-action-btn"
-                                onClick={() => setActiveTab('3d-replay')}
-                                title="3D Replay 탭으로 열기"
-                              >
-                                ⛶
-                              </button>
-                              <button
-                                className="dd-video-action-btn"
-                                onClick={() => setShow3DCard(false)}
-                                title="닫기"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
-                          <div className="dd-3d-video-canvas">
-                            <RobotViewer
-                              jointPositions={
-                                currentFrame
-                                  ? Object.fromEntries(
-                                      jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
-                                    )
-                                  : {}
-                              }
-                              showTrail={!playbackEnded}
-                              isPlaying={isPlaying}
-                              trailKey={trailKey}
-                            />
-                          </div>
+                <div>
+                  {hiddenCameras.size > 0 && (
+                    <button
+                      className="dd-restore-cameras"
+                      onClick={() => setHiddenCameras(new Set())}
+                    >
+                      + 숨겨진 카메라 {hiddenCameras.size}개 표시
+                    </button>
+                  )}
+                  <div className="dd-video-grid">
+                    {framesData && (
+                      <div className="dd-video-card glass-card">
+                        <div className="dd-video-card-header">
+                          <span className="dd-camera-label label">3D Replay</span>
                         </div>
-                      )}
-                      {visibleVideos.map((v) => (
-                        <div key={v.camera} className="dd-video-card glass-card">
-                          <div className="dd-video-card-header">
-                            <span className="dd-camera-label label">
-                              {v.camera.replace("observation.images.", "")}
-                            </span>
-                            <div className="dd-video-card-actions">
-                              <button
-                                className="dd-video-action-btn"
-                                onClick={() => handleFullscreen(v.camera)}
-                                title="전체화면"
-                              >
-                                ⛶
-                              </button>
-                              <button
-                                className="dd-video-action-btn"
-                                onClick={() =>
-                                  setHiddenCameras((prev) => new Set([...prev, v.camera]))
-                                }
-                                title="닫기"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
-                          <video
-                            ref={(el) => {
-                              if (el) videoRefs.current.set(v.camera, el);
-                              else videoRefs.current.delete(v.camera);
-                            }}
-                            src={getVideoProxyUrl(name ?? "", selectedIdx, v.camera)}
-                            preload="auto"
-                            className="dd-video"
+                        <div className="dd-3d-video-canvas">
+                          <RobotViewer
+                            jointPositions={
+                              currentFrame
+                                ? Object.fromEntries(
+                                    jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
+                                  )
+                                : {}
+                            }
+                            showTrail={true}
+                            isPlaying={isPlaying}
+                            trailKey={trailKey}
                           />
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {selectedEpisode?.language_instruction && (
-                    <div className="dd-lang-instruction glass-card">
-                      <span className="label">Language Instruction</span>
-                      <p className="dd-lang-text">{selectedEpisode.language_instruction}</p>
-                    </div>
-                  )}
-
-                  {framesData && (
-                    <div className="dd-data-grid">
-                      <div className="dd-data-cell glass-card">
-                        <div className="dd-data-cell-header">
-                          <span className="label">Joint State</span>
-                          {currentFrame && (
-                            <span className="dd-frame-badge">
-                              Frame {currentFrame.frame_index}
-                            </span>
-                          )}
-                        </div>
-                        <div className="dd-joint-table-wrap">
-                          <table className="dd-joint-table">
-                            <thead>
-                              <tr>
-                                <th>Joint</th>
-                                <th>State</th>
-                                <th>Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {jointNames.map((jname, i) => (
-                                <tr key={jname}>
-                                  <td className="dd-joint-name">{jname}</td>
-                                  <td className="dd-joint-val dd-val-state">
-                                    {currentFrame
-                                      ? (currentFrame.observation_state[i]?.toFixed(2) ?? "—")
-                                      : "—"}
-                                  </td>
-                                  <td className="dd-joint-val dd-val-action">
-                                    {currentFrame
-                                      ? (currentFrame.action[i]?.toFixed(2) ?? "—")
-                                      : "—"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
                       </div>
+                    )}
+                    {visibleVideos.map((v) => (
+                      <div key={v.camera} className="dd-video-card glass-card">
+                        <div className="dd-video-card-header">
+                          <span className="dd-camera-label label">
+                            {v.camera.replace("observation.images.", "")}
+                          </span>
+                          <div className="dd-video-card-actions">
+                            <button
+                              className="dd-video-action-btn"
+                              onClick={() => handleFullscreen(v.camera)}
+                              title="전체화면"
+                            >
+                              ⛶
+                            </button>
+                            <button
+                              className="dd-video-action-btn"
+                              onClick={() =>
+                                setHiddenCameras((prev) => new Set([...prev, v.camera]))
+                              }
+                              title="닫기"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                        <video
+                          ref={(el) => {
+                            if (el) videoRefs.current.set(v.camera, el);
+                            else videoRefs.current.delete(v.camera);
+                          }}
+                          src={getVideoProxyUrl(name ?? "", selectedIdx, v.camera)}
+                          preload="auto"
+                          className="dd-video"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                      {chartData.length > 0 &&
-                        jointGroups.map((group, gi) => {
-                          const groupOffset = gi * CHART_GROUP_SIZE;
-                          return (
-                            <div key={gi} className="dd-data-cell glass-card">
-                              <div className="dd-data-cell-header">
-                                <span className="label dd-chart-group-label">
-                                  {group.join(", ")}
-                                </span>
-                                <span className="dd-chart-hint label">━ state · ╌ action</span>
-                              </div>
-                              <ResponsiveContainer width="100%" height={200}>
-                                <LineChart
-                                  data={chartData}
-                                  margin={{ top: 4, right: 8, bottom: 4, left: -16 }}
-                                >
-                                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                  <XAxis
-                                    dataKey="time"
-                                    tick={{ fontSize: 10, fill: "var(--text-3)" }}
-                                  />
-                                  <YAxis tick={{ fontSize: 10, fill: "var(--text-3)" }} />
-                                  <Tooltip
-                                    contentStyle={{
-                                      background: "rgba(255,255,255,0.95)",
-                                      border: "1px solid var(--border)",
-                                      borderRadius: 8,
-                                      fontSize: 11,
-                                    }}
-                                  />
-                                  <Legend wrapperStyle={{ fontSize: 10 }} />
-                                  <ReferenceLine
-                                    x={currentFrame
-                                      ? parseFloat((currentFrame.frame_index / framesData.fps).toFixed(2))
-                                      : 0}
-                                    stroke="var(--orange)"
-                                    strokeWidth={1.5}
-                                  />
-                                  {group.flatMap((jname, i) => {
-                                    const ci = (groupOffset + i) % STATE_COLORS.length;
-                                    return [
-                                      <Line
-                                        key={`state_${jname}`}
-                                        type="monotone"
-                                        dataKey={`state_${jname}`}
-                                        stroke={STATE_COLORS[ci]}
-                                        dot={false}
-                                        strokeWidth={1.5}
-                                        name={jname}
-                                        isAnimationActive={false}
-                                      />,
-                                      <Line
-                                        key={`action_${jname}`}
-                                        type="monotone"
-                                        dataKey={`action_${jname}`}
-                                        stroke={ACTION_COLORS[ci]}
-                                        dot={false}
-                                        strokeWidth={1.5}
-                                        strokeDasharray="4 2"
-                                        name={`${jname}(a)`}
-                                        isAnimationActive={false}
-                                      />,
-                                    ];
-                                  })}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          );
-                        })}
+                {selectedEpisode?.language_instruction && (
+                  <div className="dd-lang-instruction glass-card">
+                    <span className="label">Language Instruction</span>
+                    <p className="dd-lang-text">{selectedEpisode.language_instruction}</p>
+                  </div>
+                )}
+
+                {framesData && (
+                  <div className="dd-data-grid">
+                    <div className="dd-data-cell glass-card">
+                      <div className="dd-data-cell-header">
+                        <span className="label">Joint State</span>
+                        {currentFrame && (
+                          <span className="dd-frame-badge">
+                            Frame {currentFrame.frame_index}
+                          </span>
+                        )}
+                      </div>
+                      <div className="dd-joint-table-wrap">
+                        <table className="dd-joint-table">
+                          <thead>
+                            <tr>
+                              <th>Joint</th>
+                              <th>State</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {jointNames.map((jname, i) => (
+                              <tr key={jname}>
+                                <td className="dd-joint-name">{jname}</td>
+                                <td className="dd-joint-val dd-val-state">
+                                  {currentFrame
+                                    ? (currentFrame.observation_state[i]?.toFixed(2) ?? "—")
+                                    : "—"}
+                                </td>
+                                <td className="dd-joint-val dd-val-action">
+                                  {currentFrame
+                                    ? (currentFrame.action[i]?.toFixed(2) ?? "—")
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
-            </main>
 
-          {activeTab === '3d-replay' && framesData && !loadingEpisode && !episodeError && (
-            <div className="dd-3d-tab-view">
-              <RobotViewer
-                jointPositions={
-                  currentFrame
-                    ? Object.fromEntries(
-                        jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
-                      )
-                    : {}
-                }
-                showTrail={!playbackEnded}
-                isPlaying={isPlaying}
-                trailKey={trailKey}
-              />
-            </div>
-          )}
+                    {chartData.length > 0 &&
+                      jointGroups.map((group, gi) => {
+                        const groupOffset = gi * CHART_GROUP_SIZE;
+                        return (
+                          <div key={gi} className="dd-data-cell glass-card">
+                            <div className="dd-data-cell-header">
+                              <span className="label dd-chart-group-label">
+                                {group.join(", ")}
+                              </span>
+                              <span className="dd-chart-hint label">━ state · ╌ action</span>
+                            </div>
+                            <ResponsiveContainer width="100%" height={200}>
+                              <LineChart
+                                data={chartData}
+                                margin={{ top: 4, right: 8, bottom: 4, left: -16 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                <XAxis
+                                  dataKey="time"
+                                  tick={{ fontSize: 10, fill: "var(--text-3)" }}
+                                />
+                                <YAxis tick={{ fontSize: 10, fill: "var(--text-3)" }} />
+                                <Tooltip
+                                  contentStyle={{
+                                    background: "rgba(255,255,255,0.95)",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: 8,
+                                    fontSize: 11,
+                                  }}
+                                />
+                                <Legend wrapperStyle={{ fontSize: 10 }} />
+                                <ReferenceLine
+                                  x={currentFrame
+                                    ? parseFloat((currentFrame.frame_index / framesData.fps).toFixed(2))
+                                    : 0}
+                                  stroke="var(--orange)"
+                                  strokeWidth={1.5}
+                                />
+                                {group.flatMap((jname, i) => {
+                                  const ci = (groupOffset + i) % STATE_COLORS.length;
+                                  return [
+                                    <Line
+                                      key={`state_${jname}`}
+                                      type="monotone"
+                                      dataKey={`state_${jname}`}
+                                      stroke={STATE_COLORS[ci]}
+                                      dot={false}
+                                      strokeWidth={1.5}
+                                      name={jname}
+                                      isAnimationActive={false}
+                                    />,
+                                    <Line
+                                      key={`action_${jname}`}
+                                      type="monotone"
+                                      dataKey={`action_${jname}`}
+                                      stroke={ACTION_COLORS[ci]}
+                                      dot={false}
+                                      strokeWidth={1.5}
+                                      strokeDasharray="4 2"
+                                      name={`${jname}(a)`}
+                                      isAnimationActive={false}
+                                    />,
+                                  ];
+                                })}
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </>
+            )}
+          </main>
 
           {framesData && !loadingEpisode && (
             <div className="dd-playbar">
