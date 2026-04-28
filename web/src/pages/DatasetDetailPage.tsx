@@ -24,7 +24,6 @@ import {
   type VideoUrl,
 } from "../api/datasets";
 import "./DatasetDetailPage.css";
-import RobotViewer from "./RobotViewer";
 
 const STATE_COLORS = ["#7c3aed", "#2563eb", "#0891b2", "#059669", "#d97706", "#dc2626"];
 const ACTION_COLORS = ["#c4b5fd", "#93c5fd", "#67e8f9", "#6ee7b7", "#fcd34d", "#fca5a5"];
@@ -51,15 +50,6 @@ export default function DatasetDetailPage() {
   const [duration, setDuration] = useState(0);
   const [hiddenCameras, setHiddenCameras] = useState<Set<string>>(new Set());
 
-  const [activeTab, setActiveTab] = useState<"episodes" | "3d-replay">("episodes");
-  const [showTrail, setShowTrail] = useState(false);
-  const [trailPositions, setTrailPositions] = useState<[number, number, number][]>([]);
-  const playIntervalRef = useRef<number | null>(null);
-  const showTrailRef = useRef(showTrail);
-  const isPlayingRef = useRef(isPlaying);
-  showTrailRef.current = showTrail;
-  isPlayingRef.current = isPlaying;
-
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   useEffect(() => {
@@ -80,12 +70,6 @@ export default function DatasetDetailPage() {
     setIsPlaying(false);
     setDuration(0);
     setHiddenCameras(new Set());
-    setTrailPositions([]);
-    setActiveTab("episodes");
-    if (playIntervalRef.current !== null) {
-      clearInterval(playIntervalRef.current);
-      playIntervalRef.current = null;
-    }
     videoRefs.current.clear();
 
     Promise.all([getVideoUrls(name, selectedIdx), getEpisodeFrames(name, selectedIdx)])
@@ -149,57 +133,15 @@ export default function DatasetDetailPage() {
 
   const selectEpisode = (idx: number) => setSearchParams({ episode: String(idx) });
 
-  const toggle3DPlayback = useCallback(() => {
-    if (!framesData) return;
-    if (playIntervalRef.current !== null) {
-      clearInterval(playIntervalRef.current);
-      playIntervalRef.current = null;
-      setIsPlaying(false);
-      return;
-    }
-    const startIdx = currentFrame?.frame_index ?? 0;
-    let idx = startIdx;
-    setIsPlaying(true);
-    playIntervalRef.current = window.setInterval(() => {
-      idx += 1;
-      if (idx >= framesData.frames.length) {
-        clearInterval(playIntervalRef.current!);
-        playIntervalRef.current = null;
-        setIsPlaying(false);
-        return;
-      }
-      setCurrentFrame(framesData.frames[idx]);
-    }, 1000 / framesData.fps);
-  }, [framesData, currentFrame]);
-
   const togglePlayPause = useCallback(() => {
-    if (activeTab === "3d-replay") {
-      toggle3DPlayback();
-      return;
-    }
     const vid = firstCameraKey ? videoRefs.current.get(firstCameraKey) : null;
     if (!vid) return;
     if (vid.paused) vid.play();
     else vid.pause();
-  }, [activeTab, firstCameraKey, toggle3DPlayback]);
+  }, [firstCameraKey]);
 
   const handleSeek = useCallback(
     (ratio: number) => {
-      if (activeTab === "3d-replay") {
-        if (playIntervalRef.current !== null) {
-          clearInterval(playIntervalRef.current);
-          playIntervalRef.current = null;
-          setIsPlaying(false);
-        }
-        if (!framesData) return;
-        const frameIdx = Math.min(
-          Math.floor(ratio * framesData.frames.length),
-          framesData.frames.length - 1
-        );
-        setCurrentFrame(framesData.frames[frameIdx]);
-        setCurrentTime(framesData.frames[frameIdx].timestamp);
-        return;
-      }
       const time = ratio * duration;
       videoRefs.current.forEach((vid) => { vid.currentTime = time; });
       setCurrentTime(time);
@@ -211,31 +153,19 @@ export default function DatasetDetailPage() {
         if (frameIdx >= 0) setCurrentFrame(framesData.frames[frameIdx]);
       }
     },
-    [activeTab, duration, framesData]
+    [duration, framesData]
   );
 
   const stepFrame = useCallback(
     (delta: number) => {
-      if (!framesData) return;
-      if (activeTab === "3d-replay") {
-        if (playIntervalRef.current !== null) {
-          clearInterval(playIntervalRef.current);
-          playIntervalRef.current = null;
-          setIsPlaying(false);
-        }
-        const curIdx = currentFrame?.frame_index ?? 0;
-        const newIdx = Math.max(0, Math.min(framesData.frames.length - 1, curIdx + delta));
-        setCurrentFrame(framesData.frames[newIdx]);
-        return;
-      }
-      if (duration === 0) return;
+      if (!framesData || duration === 0) return;
       const newTime = Math.max(
         0,
         Math.min(duration, currentTime + (delta / framesData.fps))
       );
       handleSeek(newTime / duration);
     },
-    [activeTab, framesData, duration, currentTime, currentFrame, handleSeek]
+    [framesData, duration, currentTime, handleSeek]
   );
 
   useEffect(() => {
@@ -315,21 +245,6 @@ export default function DatasetDetailPage() {
         <span className="badge badge-purple" style={{ marginLeft: 8 }}>{info.robot_type}</span>
       </nav>
 
-      <div className="dd-tab-bar">
-        <button
-          className={`dd-tab ${activeTab === "episodes" ? "active" : ""}`}
-          onClick={() => setActiveTab("episodes")}
-        >
-          Episodes
-        </button>
-        <button
-          className={`dd-tab ${activeTab === "3d-replay" ? "active" : ""}`}
-          onClick={() => setActiveTab("3d-replay")}
-        >
-          3D Replay
-        </button>
-      </div>
-
       <div className="dd-layout">
         <aside className="dd-sidebar">
           <div className="dd-sidebar-stats">
@@ -381,8 +296,6 @@ export default function DatasetDetailPage() {
               <p className="dd-state-msg dd-state-error">Error: {episodeError}</p>
             )}
 
-            {/* Episodes 콘텐츠: 탭 전환 시 video가 언마운트되지 않도록 display로만 숨김 */}
-            <div style={{ display: activeTab === "episodes" ? "contents" : "none" }}>
             {!loadingEpisode && !episodeError && (
               <>
                 <div className="dd-ep-header">
@@ -568,44 +481,6 @@ export default function DatasetDetailPage() {
                 )}
               </>
             )}
-            </div>
-
-            {activeTab === "3d-replay" && framesData && (
-              <div className="dd-3d-wrapper">
-                <div className="dd-3d-controls">
-                  <button
-                    className={`dd-trail-btn ${showTrail ? "active" : ""}`}
-                    onClick={() => setShowTrail((v) => !v)}
-                  >
-                    Trail
-                  </button>
-                  <span className="dd-key-hint">
-                    shoulder_pan→Rotation · shoulder_lift→Pitch · elbow_flex→Elbow · wrist_flex→Wrist_Pitch · wrist_roll→Wrist_Roll · gripper→Jaw
-                  </span>
-                </div>
-                <div className="dd-3d-canvas">
-                  <RobotViewer
-                    jointPositions={
-                      currentFrame
-                        ? Object.fromEntries(
-                            jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
-                          )
-                        : {}
-                    }
-                    trailPositions={trailPositions}
-                    showTrail={showTrail}
-                    onEndEffectorPos={(pos) => {
-                      if (showTrailRef.current && isPlayingRef.current) {
-                        setTrailPositions((prev) => {
-                          const next = [...prev, pos] as [number, number, number][];
-                          return next.length > 2000 ? next.slice(-2000) : next;
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </main>
 
           {framesData && !loadingEpisode && (
@@ -624,13 +499,7 @@ export default function DatasetDetailPage() {
                 min={0}
                 max={1}
                 step={0.001}
-                value={
-                  activeTab === "3d-replay" && framesData
-                    ? (currentFrame?.frame_index ?? 0) / (framesData.frames.length - 1)
-                    : duration > 0
-                    ? currentTime / duration
-                    : 0
-                }
+                value={duration > 0 ? currentTime / duration : 0}
                 onChange={(e) => handleSeek(Number(e.target.value))}
                 className="dd-scrubber"
               />
