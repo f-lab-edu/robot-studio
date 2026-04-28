@@ -570,42 +570,42 @@ export default function DatasetDetailPage() {
             )}
             </div>
 
-            {/* 3D Replay: CSS로만 숨겨서 WebGL context가 탭 전환 시 재생성되지 않도록 함 */}
-            <div style={{ display: activeTab === "3d-replay" ? "contents" : "none" }}>
-              {framesData && (
-                <div className="dd-3d-wrapper">
-                  <div className="dd-3d-controls">
-                    <button
-                      className={`dd-trail-btn ${showTrail ? "active" : ""}`}
-                      onClick={() => setShowTrail((v) => !v)}
-                    >
-                      Trail
-                    </button>
-                  </div>
-                  <div className="dd-3d-canvas">
-                    <RobotViewer
-                      jointPositions={
-                        currentFrame
-                          ? Object.fromEntries(
-                              jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
-                            )
-                          : {}
-                      }
-                      trailPositions={trailPositions}
-                      showTrail={showTrail}
-                      onEndEffectorPos={(pos) => {
-                        if (showTrailRef.current && isPlayingRef.current) {
-                          setTrailPositions((prev) => {
-                            const next = [...prev, pos] as [number, number, number][];
-                            return next.length > 2000 ? next.slice(-2000) : next;
-                          });
-                        }
-                      }}
-                    />
-                  </div>
+            {activeTab === "3d-replay" && framesData && (
+              <div className="dd-3d-wrapper">
+                <div className="dd-3d-controls">
+                  <button
+                    className={`dd-trail-btn ${showTrail ? "active" : ""}`}
+                    onClick={() => setShowTrail((v) => !v)}
+                  >
+                    Trail
+                  </button>
+                  <span className="dd-key-hint">
+                    shoulder_pan→Rotation · shoulder_lift→Pitch · elbow_flex→Elbow · wrist_flex→Wrist_Pitch · wrist_roll→Wrist_Roll · gripper→Jaw
+                  </span>
                 </div>
-              )}
-            </div>
+                <div className="dd-3d-canvas">
+                  <RobotViewer
+                    jointPositions={
+                      currentFrame
+                        ? Object.fromEntries(
+                            jointNames.map((jname, i) => [jname, currentFrame.observation_state[i] ?? 0])
+                          )
+                        : {}
+                    }
+                    trailPositions={trailPositions}
+                    showTrail={showTrail}
+                    onEndEffectorPos={(pos) => {
+                      if (showTrailRef.current && isPlayingRef.current) {
+                        setTrailPositions((prev) => {
+                          const next = [...prev, pos] as [number, number, number][];
+                          return next.length > 2000 ? next.slice(-2000) : next;
+                        });
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </main>
 
           {framesData && !loadingEpisode && (

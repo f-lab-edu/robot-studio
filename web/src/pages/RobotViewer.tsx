@@ -15,12 +15,6 @@ export const JOINT_MAP: Record<string, string> = {
   gripper: "Jaw",
 };
 
-// Feetech STS3215 서보: 0~4095 범위, 2048 = 중립(0rad), 4096 steps = 2π rad
-function servoToRad(value: number): number {
-  if (Math.abs(value) <= Math.PI * 2) return value;
-  return (value - 2048) * (2 * Math.PI / 4096);
-}
-
 interface RobotModelProps {
   jointPositions: Record<string, number>;
   onEndEffectorPos?: (pos: [number, number, number]) => void;
@@ -76,7 +70,7 @@ function RobotModel({ jointPositions, onEndEffectorPos, trailPositions, showTrai
     Object.entries(jointPositions).forEach(([datasetName, angle]) => {
       const urdfJointName = JOINT_MAP[datasetName];
       if (urdfJointName && robot.joints[urdfJointName]) {
-        robot.joints[urdfJointName].setJointValue(servoToRad(angle));
+        robot.joints[urdfJointName].setJointValue(angle);
       }
     });
 
