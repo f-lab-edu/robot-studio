@@ -8,6 +8,7 @@ class ApiClient:
         self.base_url = base_url
         self._session: aiohttp.ClientSession | None = None
         self._token: str | None = None
+        self._refresh_token: str | None = None
 
     @property
     def session(self) -> aiohttp.ClientSession:
@@ -19,8 +20,24 @@ class ApiClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    def set_token(self, token: str) -> None:
-        self._token = token
+    def set_token(self, access_token: str, refresh_token: str) -> None:
+        self._token = access_token
+        self._refresh_token = refresh_token
+
+    async def _refresh_tokens(self) -> None:
+        if not self._refresh_token:
+            raise ValueError("refresh_token이 없습니다")
+        async with self.session.post(
+            f"{self.base_url}/api/v1/auth/refresh",
+            json={"refresh_token": self._refresh_token},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as response:
+            if response.status == 401:
+                raise ValueError("refresh_token이 만료되었습니다")
+            response.raise_for_status()
+            data = await response.json()
+            self._token = data["access_token"]
+            self._refresh_token = data["refresh_token"]
 
     def _auth_headers(self) -> dict:
         if self._token:
@@ -41,15 +58,19 @@ class ApiClient:
 
     async def get_presigned_url(self, object_name: str) -> str:
         """단일 presigned URL 요청"""
-        async with self.session.post(
-            f"{self.base_url}/api/v1/objects/presigned-upload-url",
-            json={"object_name": object_name},
-            headers=self._auth_headers(),
-            timeout=aiohttp.ClientTimeout(total=10)
-        ) as response:
-            response.raise_for_status()
-            data = await response.json()
-            return data['url']
+        for attempt in range(2):
+            async with self.session.post(
+                f"{self.base_url}/api/v1/objects/presigned-upload-url",
+                json={"object_name": object_name},
+                headers=self._auth_headers(),
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                if response.status == 401 and attempt == 0:
+                    await self._refresh_tokens()
+                    continue
+                response.raise_for_status()
+                data = await response.json()
+                return data["url"]
 
     async def upload_to_s3(self, presigned_url: str, video_path: str):
         """Presigned URL로 파일 업로드"""
