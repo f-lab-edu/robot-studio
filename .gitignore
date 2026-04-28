@@ -32,11 +32,6 @@ Thumbs.db
 
 # Node
 node_modules/
-web/tsconfig.tsbuildinfo
-
-# Tools
-.playwright-mcp/
-.superpowers/
 
 # Logs
 *.log
