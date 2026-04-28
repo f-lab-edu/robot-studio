@@ -98,9 +98,10 @@ body {
 }
 
 .navbar-logo {
-  height: 36px;
-  width: auto;
-  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--purple);
+  letter-spacing: -0.3px;
   text-decoration: none;
 }
 
